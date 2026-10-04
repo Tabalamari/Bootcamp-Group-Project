@@ -1,0 +1,30 @@
+/tmp
+package-lock.json
+database.sqlite
+
+# Node and build outputs
+/node_modules
+/.pnp
+.pnp.js
+.cache
+.vite
+.vite/deps
+
+# Environment variables (contains secrets!)
+.env
+.env.test
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/logs/
+
+# IDE settings
+.idea
+.vscode
+*.swp
+
+
