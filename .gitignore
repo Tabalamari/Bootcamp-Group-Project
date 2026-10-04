@@ -1,9 +1,11 @@
 /tmp
+tmp
 package-lock.json
 database.sqlite
 
 # Node and build outputs
-/node_modules
+
+backend/node_modules
 /.pnp
 .pnp.js
 .cache

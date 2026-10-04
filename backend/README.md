@@ -1,45 +1,45 @@
 # Backend: Bootcamp Connect (FR-01)
 
-Реалізація серверної частини для першої спільної фічі команди: **Реєстрація, автентифікація, вибір курсу, захищений доступ та вихід**.
+Backend implementation for the team's first core feature: **Registration, authentication, course selection, protected access, and logout**.
 
-**Відповідальна:** Маріанна  
-**Стек:** Node.js, Express.js, SQLite (`better-sqlite3`), `bcryptjs`, Bearer Token (UUID)
+**Owner:** Marianna  
+**Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `bcryptjs`, Bearer Token (UUID)
 
 ---
 
-## 🚀 Швидкий старт
+## 🚀 Quick Start
 
-### 1. Встановлення залежностей
+### 1. Install Dependencies
 ```bash
 cd backend
 npm install
 ```
 
-### 2. Запуск сервера
+### 2. Start the Server
 ```bash
 npm start
-# або в режимі розробки з авто-перезавантаженням:
+# or in development mode with auto-reload:
 npm run dev
 ```
-Сервер запуститься за адресою: `http://localhost:3000`  
-База даних `database.sqlite` створиться автоматично з таблицями `courses`, `users`, `sessions` та двома активними курсами.
+The server will start at: `http://localhost:3000`  
+The database `database.sqlite` is created automatically with `courses`, `users`, and `sessions` tables and seeded with two active courses.
 
-### 3. Автоматичне тестування (для Маріанни та Цінглінг)
+### 3. Automated Testing (for Marianna and Qingling)
 ```bash
 npm test
 ```
-Скрипт перевіряє всі 11 обов'язкових сценаріїв (реєстрація, валідація, захист від дублікатів, логін, правильний/неправильний пароль, доступ до `GET /api/auth/me`, логаут та інвалідація сесії).
+The script tests all mandatory scenarios (registration, validation, duplicate rejection, login, valid/invalid password, protected access to `GET /api/auth/me`, logout, and session invalidation).
 
 ---
 
-## 📡 Ендпоінти API
+## 📡 API Endpoints
 
-Базовий URL: `http://localhost:3000/api`
+Base URL: `http://localhost:3000/api`
 
-### 1. Курси (Публічний)
+### 1. Courses (Public)
 - **`GET /api/courses`**
-  - **Опис:** Повертає список активних курсів для форми реєстрації Малак.
-  - **Відповідь (200 OK):**
+  - **Description:** Returns the list of active courses for Malak's registration form.
+  - **Response (200 OK):**
     ```json
     [
       { "id": "software-dev", "name": "Software Development" },
@@ -47,24 +47,24 @@ npm test
     ]
     ```
 
-### 2. Реєстрація (Публічний)
+### 2. Registration (Public)
 - **`POST /api/auth/register`**
-  - **Тіло запиту (JSON):**
+  - **Request Body (JSON):**
     ```json
     {
-      "displayName": "Олександр",
+      "displayName": "Alex",
       "email": "alex@example.com",
       "password": "password123",
       "courseId": "software-dev"
     }
     ```
-  - **Успіх (201 Created):**
+  - **Success (201 Created):**
     ```json
     {
       "token": "3394982a-4318-472e-8418-e3a5a76fa4d5",
       "user": {
         "id": "...",
-        "displayName": "Олександр",
+        "displayName": "Alex",
         "email": "alex@example.com",
         "courseId": "software-dev",
         "courseName": "Software Development",
@@ -72,34 +72,34 @@ npm test
       }
     }
     ```
-  - **Помилки:**
-    - `400 Bad Request` — не всі поля заповнені / пароль коротший 8 символів / неіснуючий курс.
-    - `409 Conflict` — email вже використовується іншим користувачем.
+  - **Errors:**
+    - `400 Bad Request` — missing required fields / password shorter than 8 characters / non-existent or inactive course.
+    - `409 Conflict` — email is already registered by another user.
 
-### 3. Вхід (Публічний)
+### 3. Login (Public)
 - **`POST /api/auth/login`**
-  - **Тіло запиту (JSON):**
+  - **Request Body (JSON):**
     ```json
     {
       "email": "alex@example.com",
       "password": "password123"
     }
     ```
-  - **Успіх (200 OK):** повертає `token` та об'єкт `user`.
-  - **Помилки:**
-    - `401 Unauthorized` — невірний email або пароль (`{ "error": "Невірний email або пароль" }`).
-    - `403 Forbidden` — акаунт заблоковано (`{ "error": "Ваш акаунт заблоковано" }`).
+  - **Success (200 OK):** returns `token` and `user` object.
+  - **Errors:**
+    - `401 Unauthorized` — invalid email or password (`{ "error": "Invalid email or password" }`).
+    - `403 Forbidden` — account is suspended (`{ "error": "Your account is suspended" }`).
 
-### 4. Дані поточного користувача (Захищений)
+### 4. Current User Profile (Protected)
 - **`GET /api/auth/me`**
-  - **Заголовок:** `Authorization: Bearer <token>`
-  - **Опис:** Викликається фронтендом для відображення захищеної Welcome-сторінки.
-  - **Успіх (200 OK):**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Description:** Called by the frontend to display the protected Welcome page.
+  - **Success (200 OK):**
     ```json
     {
       "user": {
         "id": "...",
-        "displayName": "Олександр",
+        "displayName": "Alex",
         "email": "alex@example.com",
         "courseId": "software-dev",
         "courseName": "Software Development",
@@ -107,18 +107,18 @@ npm test
       }
     }
     ```
-  - **Помилка (401 Unauthorized):** токен відсутній або недійсний.
+  - **Error (401 Unauthorized):** token missing or invalid.
 
-### 5. Вихід (Захищений)
+### 5. Logout (Protected)
 - **`POST /api/auth/logout`**
-  - **Заголовок:** `Authorization: Bearer <token>`
-  - **Успіх (200 OK):** `{ "message": "Успішний вихід" }`. Сесія видаляється з бази.
+  - **Header:** `Authorization: Bearer <token>`
+  - **Success (200 OK):** `{ "message": "Successfully logged out" }`. Session is removed from the database.
 
 ---
 
-## 🗄 Структура бази даних SQLite
+## 🗄 SQLite Database Schema
 
-Файл `database.sqlite` створюється автоматично:
+The `database.sqlite` file is created automatically:
 
 1. **`courses`**: `id` (TEXT, PK), `name` (TEXT), `is_active` (INTEGER).
 2. **`users`**: `id` (TEXT, PK), `email` (TEXT, UNIQUE), `password_hash` (TEXT), `display_name` (TEXT), `course_id` (TEXT, FK), `role` (TEXT), `status` (TEXT), `created_at` (DATETIME).

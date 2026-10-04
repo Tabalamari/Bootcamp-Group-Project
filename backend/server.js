@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Базовий інформаційний маршрут
+// Basic health and info route
 app.get('/api', (req, res) => {
   res.json({
     name: 'Bootcamp Connect API',
@@ -20,16 +20,16 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Middleware для захисту маршрутів (перевірка токена сесії)
+// Middleware for route protection (session token verification)
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Необхідно увійти в систему' });
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
   const token = authHeader.split(' ')[1];
   if (!token) {
-    return res.status(401).json({ error: 'Токен сесії не надано' });
+    return res.status(401).json({ error: 'Session token is missing' });
   }
 
   const session = db.prepare(`
@@ -48,11 +48,11 @@ function authMiddleware(req, res, next) {
   `).get(token);
 
   if (!session) {
-    return res.status(401).json({ error: 'Сесія недійсна або застаріла' });
+    return res.status(401).json({ error: 'Invalid or expired session' });
   }
 
   if (session.status === 'suspended') {
-    return res.status(403).json({ error: 'Ваш акаунт заблоковано' });
+    return res.status(403).json({ error: 'Your account is suspended' });
   }
 
   req.user = session;
@@ -61,7 +61,7 @@ function authMiddleware(req, res, next) {
 }
 
 // -------------------------------------------------------------
-// 1. Отримати список активних курсів (GET /api/courses)
+// 1. Get list of active courses (GET /api/courses)
 // -------------------------------------------------------------
 app.get('/api/courses', (req, res) => {
   try {
@@ -74,54 +74,54 @@ app.get('/api/courses', (req, res) => {
 
     res.json(courses);
   } catch (error) {
-    res.status(500).json({ error: 'Помилка отримання списку курсів' });
+    res.status(500).json({ error: 'Failed to retrieve courses' });
   }
 });
 
 // -------------------------------------------------------------
-// 2. Реєстрація нового користувача (POST /api/auth/register)
+// 2. Register a new user (POST /api/auth/register)
 // -------------------------------------------------------------
 app.post('/api/auth/register', (req, res) => {
   try {
     const { displayName, email, password, courseId } = req.body;
 
-    // Перевірка обов'язкових полів
+    // Check required fields
     if (!displayName || !email || !password || !courseId) {
-      return res.status(400).json({ error: "Всі поля (displayName, email, password, courseId) є обов'язковими" });
+      return res.status(400).json({ error: 'All fields (displayName, email, password, courseId) are required' });
     }
 
     const trimmedName = displayName.trim();
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Валідація довжини імені
+    // Validate name length
     if (trimmedName.length < 2) {
-      return res.status(400).json({ error: "Ім'я повинно містити щонайменше 2 символи" });
+      return res.status(400).json({ error: 'Display name must be at least 2 characters long' });
     }
 
-    // Валідація формату email
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({ error: 'Введіть коректну адресу електронної пошти' });
+      return res.status(400).json({ error: 'Please enter a valid email address' });
     }
 
-    // Валідація довжини пароля
+    // Validate password length
     if (password.length < 8) {
-      return res.status(400).json({ error: 'Пароль повинен містити щонайменше 8 символів' });
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
     }
 
-    // Перевірка існування та активності курсу
+    // Check course existence and active status
     const course = db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
     if (!course) {
-      return res.status(400).json({ error: 'Обраний курс не існує або недоступний для вибору' });
+      return res.status(400).json({ error: 'Selected course does not exist or is unavailable' });
     }
 
-    // Перевірка унікальності email
+    // Check email uniqueness
     const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
     if (existingUser) {
-      return res.status(409).json({ error: 'Користувач із цим email вже зареєстрований' });
+      return res.status(409).json({ error: 'A user with this email is already registered' });
     }
 
-    // Хешування пароля та створення користувача
+    // Hash password and create user
     const userId = crypto.randomUUID();
     const passwordHash = bcrypt.hashSync(password, 10);
 
@@ -130,7 +130,7 @@ app.post('/api/auth/register', (req, res) => {
       VALUES (?, ?, ?, ?, ?, 'learner', 'active')
     `).run(userId, normalizedEmail, passwordHash, trimmedName, courseId);
 
-    // Створення сесії (автологін)
+    // Create session (auto-login)
     const token = crypto.randomUUID();
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
 
@@ -146,19 +146,19 @@ app.post('/api/auth/register', (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Помилка при реєстрації користувача' });
+    res.status(500).json({ error: 'Failed to register user' });
   }
 });
 
 // -------------------------------------------------------------
-// 3. Вхід у систему (POST /api/auth/login)
+// 3. User login (POST /api/auth/login)
 // -------------------------------------------------------------
 app.post('/api/auth/login', (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Введіть email та пароль' });
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -178,17 +178,17 @@ app.post('/api/auth/login', (req, res) => {
       WHERE users.email = ?
     `).get(normalizedEmail);
 
-    // Уніфікована помилка для безпеки (запобігання скануванню email)
+    // Unified error for security (prevent email enumeration)
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-      return res.status(401).json({ error: 'Невірний email або пароль' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Перевірка статусу акаунта
+    // Check account status
     if (user.status === 'suspended') {
-      return res.status(403).json({ error: 'Ваш акаунт заблоковано' });
+      return res.status(403).json({ error: 'Your account is suspended' });
     }
 
-    // Створення сесії
+    // Create session
     const token = crypto.randomUUID();
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
 
@@ -204,12 +204,12 @@ app.post('/api/auth/login', (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Помилка при вході' });
+    res.status(500).json({ error: 'Failed to log in' });
   }
 });
 
 // -------------------------------------------------------------
-// 4. Отримання даних поточного користувача (GET /api/auth/me)
+// 4. Get current user profile (GET /api/auth/me)
 // -------------------------------------------------------------
 app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({
@@ -225,18 +225,18 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 5. Вихід із системи (POST /api/auth/logout)
+// 5. User logout (POST /api/auth/logout)
 // -------------------------------------------------------------
 app.post('/api/auth/logout', authMiddleware, (req, res) => {
   try {
     db.prepare('DELETE FROM sessions WHERE token = ?').run(req.token);
-    res.json({ message: 'Успішний вихід' });
+    res.json({ message: 'Successfully logged out' });
   } catch (error) {
-    res.status(500).json({ error: 'Помилка при виході' });
+    res.status(500).json({ error: 'Failed to log out' });
   }
 });
 
-// Запуск сервера, якщо файл викликано напряму
+// Start the server if file is executed directly
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);

@@ -4,19 +4,19 @@ const Database = require('better-sqlite3');
 const dbPath = path.join(__dirname, 'database.sqlite');
 const db = new Database(dbPath);
 
-// Увімкнення підтримки Foreign Keys у SQLite
+// Enable Foreign Keys support in SQLite
 db.pragma('foreign_keys = ON');
 
-// Створення таблиць
+// Create tables
 db.exec(`
-  -- 1. Довідник курсів
+  -- 1. Courses directory
   CREATE TABLE IF NOT EXISTS courses (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     is_active INTEGER DEFAULT 1
   );
 
-  -- 2. Облікові записи користувачів
+  -- 2. User accounts
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -29,7 +29,7 @@ db.exec(`
     FOREIGN KEY (course_id) REFERENCES courses(id)
   );
 
-  -- 3. Активні сесії користувачів
+  -- 3. Active user sessions
   CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -38,7 +38,7 @@ db.exec(`
   );
 `);
 
-// Початкове наповнення курсів (Seed data)
+// Initial course seeding (Seed data)
 const seedCourse = db.prepare(`
   INSERT OR IGNORE INTO courses (id, name, is_active)
   VALUES (?, ?, ?)

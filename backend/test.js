@@ -1,15 +1,15 @@
 /**
- * Автоматизований тестовий скрипт для перевірки всіх вимог Маріанни та критеріїв Цінглінг
- * Запуск: node test.js
+ * Automated test suite for Marianna's backend requirements and Qingling's criteria
+ * Usage: node test.js
  */
 
 const app = require('./server');
 const db = require('./db');
 
 async function runTests() {
-  console.log('\n=== ПОЧАТОК ТЕСТУВАННЯ BACKEND API ===\n');
+  console.log('\n=== STARTING BACKEND API TESTS ===\n');
 
-  // Запуск сервера на вільному динамічному порті
+  // Start server on an ephemeral port
   const server = app.listen(0);
   const port = server.address().port;
   const baseUrl = `http://localhost:${port}/api`;
@@ -28,20 +28,20 @@ async function runTests() {
   }
 
   try {
-    // Очищення тестових користувачів перед тестом (якщо залишились)
+    // Clean up test users before tests (if any remain)
     db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
 
-    // ТЕСТ 1: Отримання курсів (GET /api/courses)
+    // TEST 1: Retrieve courses (GET /api/courses)
     const resCourses = await fetch(`${baseUrl}/courses`);
     const courses = await resCourses.json();
     assert(
       resCourses.status === 200 && Array.isArray(courses) && courses.length >= 2,
-      'GET /api/courses повертає статус 200 та список активних курсів'
+      'GET /api/courses returns status 200 and a list of active courses'
     );
 
-    // ТЕСТ 2: Успішна реєстрація (POST /api/auth/register)
+    // TEST 2: Successful registration (POST /api/auth/register)
     const testUser = {
-      displayName: 'Тестовий Студент',
+      displayName: 'Test Student',
       email: 'test_student@example.com',
       password: 'StrongPassword123!',
       courseId: 'software-dev'
@@ -55,14 +55,14 @@ async function runTests() {
     const regData = await resRegister.json();
     assert(
       resRegister.status === 201 && regData.token && regData.user.email === testUser.email,
-      'POST /api/auth/register створює обліковий запис і повертає токен та дані користувача'
+      'POST /api/auth/register creates an account and returns token and user data'
     );
     assert(
       regData.user.password_hash === undefined && regData.user.password === undefined,
-      'Реєстрація не повертає пароль або хеш пароля у відповіді'
+      'Registration response does not expose password or password hash'
     );
 
-    // ТЕСТ 3: Відхилення дубліката email (409 Conflict)
+    // TEST 3: Duplicate email rejection (409 Conflict)
     const resDuplicate = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -70,15 +70,15 @@ async function runTests() {
     });
     assert(
       resDuplicate.status === 409,
-      'POST /api/auth/register відхиляє дублікат email (409 Conflict)'
+      'POST /api/auth/register rejects duplicate email (409 Conflict)'
     );
 
-    // ТЕСТ 4: Відхилення короткого пароля (< 8 символів)
+    // TEST 4: Short password rejection (< 8 characters)
     const resShortPass = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        displayName: 'Короткий',
+        displayName: 'Short',
         email: 'test_short@example.com',
         password: 'short',
         courseId: 'software-dev'
@@ -86,15 +86,15 @@ async function runTests() {
     });
     assert(
       resShortPass.status === 400,
-      'POST /api/auth/register відхиляє пароль коротший за 8 символів (400 Bad Request)'
+      'POST /api/auth/register rejects password shorter than 8 characters (400 Bad Request)'
     );
 
-    // ТЕСТ 5: Відхилення неіснуючого курсу
+    // TEST 5: Non-existent course rejection
     const resInvalidCourse = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        displayName: 'Невірний курс',
+        displayName: 'Invalid Course',
         email: 'test_invalid_course@example.com',
         password: 'password123',
         courseId: 'unknown-course-id'
@@ -102,10 +102,10 @@ async function runTests() {
     });
     assert(
       resInvalidCourse.status === 400,
-      'POST /api/auth/register відхиляє неіснуючий курс (400 Bad Request)'
+      'POST /api/auth/register rejects non-existent course (400 Bad Request)'
     );
 
-    // ТЕСТ 6: Успішний вхід (POST /api/auth/login)
+    // TEST 6: Successful login (POST /api/auth/login)
     const resLogin = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,12 +117,12 @@ async function runTests() {
     const loginData = await resLogin.json();
     assert(
       resLogin.status === 200 && loginData.token && loginData.user.email === testUser.email,
-      'POST /api/auth/login повертає статус 200 та новий сесійний токен'
+      'POST /api/auth/login returns status 200 and a new session token'
     );
 
     const authToken = loginData.token;
 
-    // ТЕСТ 7: Невірний пароль при вході
+    // TEST 7: Invalid password on login
     const resWrongPass = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,54 +133,54 @@ async function runTests() {
     });
     assert(
       resWrongPass.status === 401,
-      'POST /api/auth/login повертає 401 Unauthorized при невірному паролі'
+      'POST /api/auth/login returns 401 Unauthorized on invalid password'
     );
 
-    // ТЕСТ 8: Доступ до захищеного маршруту (GET /api/auth/me)
+    // TEST 8: Access protected route (GET /api/auth/me)
     const resMe = await fetch(`${baseUrl}/auth/me`, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
     const meData = await resMe.json();
     assert(
       resMe.status === 200 && meData.user.email === testUser.email,
-      'GET /api/auth/me повертає дані профілю з валідним Bearer токеном'
+      'GET /api/auth/me returns profile data with valid Bearer token'
     );
 
-    // ТЕСТ 9: Відхилення неавторизованого доступу
+    // TEST 9: Unauthorized access rejection
     const resUnauthorized = await fetch(`${baseUrl}/auth/me`);
     assert(
       resUnauthorized.status === 401,
-      'GET /api/auth/me відхиляє запит без токена (401 Unauthorized)'
+      'GET /api/auth/me rejects request without token (401 Unauthorized)'
     );
 
-    // ТЕСТ 10: Вихід із системи (POST /api/auth/logout)
+    // TEST 10: User logout (POST /api/auth/logout)
     const resLogout = await fetch(`${baseUrl}/auth/logout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${authToken}` }
     });
     assert(
       resLogout.status === 200,
-      'POST /api/auth/logout успішно завершує сесію (200 OK)'
+      'POST /api/auth/logout successfully terminates session (200 OK)'
     );
 
-    // ТЕСТ 11: Перевірка, що токен більше не дійсний після logout
+    // TEST 11: Verify token is invalid after logout
     const resAfterLogout = await fetch(`${baseUrl}/auth/me`, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
     assert(
       resAfterLogout.status === 401,
-      'GET /api/auth/me повертає 401 для токена після завершення сесії'
+      'GET /api/auth/me returns 401 for token after session termination'
     );
 
   } catch (err) {
-    console.error('Помилка під час виконання тестів:', err);
+    console.error('Error during test execution:', err);
     failed++;
   } finally {
-    // Очищення тестових записів
+    // Clean up test records
     db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
 
     server.close();
-    console.log(`\n=== РЕЗУЛЬТАТ: ${passed} пройдено, ${failed} провалено ===\n`);
+    console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);
     if (failed > 0) {
       process.exit(1);
     }
