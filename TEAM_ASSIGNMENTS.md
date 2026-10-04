@@ -1,6 +1,8 @@
 # Bootcamp Connect - First Feature Assignments
 
 Date: 1 October 2026  
+Last updated: 4 October 2026
+
 Related specification: [PRD.md](PRD.md), FR-01
 
 ## Shared first feature
@@ -19,6 +21,16 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ## Malak - Frontend
 
+### Current status
+
+Frontend demo implemented on `feature/frontend-auth` in [frontend/](frontend/). Uses React, JavaScript, Vite and Tailwind CSS with the approved blue design and responsive desktop, laptop and mobile layouts.
+
+Registration, course selection, login, a welcome screen and logout are available using temporary sample accounts. Accounts and sessions reset on a page reload. This is frontend demonstration behavior, not real authentication or persistent storage.
+
+Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
+
+Next: review the proposed API contract with Marianna, connect the real backend, and resolve any integration issues. Setup instructions, sample credentials and the proposed API are in [frontend/README.md](frontend/README.md).
+
 ### Tasks
 
 - Build a registration form with display name, email, password, and course selection.
@@ -31,14 +43,19 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ### Done when
 
-- [ ] A user can register and sign in through the interface.
-- [ ] Course options load and the selected course is submitted correctly.
-- [ ] Invalid inputs and backend errors have understandable feedback.
-- [ ] A signed-in user reaches the protected welcome page.
-- [ ] Signing out returns the user to a public screen.
+- [x] A user can register and sign in through the interface in demo mode.
+- [x] Sample course options load and the selected course reaches the demo service correctly.
+- [x] Invalid inputs and demo authentication errors have understandable feedback.
+- [x] A signed-in demo user reaches the welcome page; signed-out users are gated in the interface.
+- [x] Signing out returns the user to a public screen in demo mode.
+- [ ] Real API error responses and session behavior are verified after integration.
 - [ ] The complete interface works with the real backend.
 
 ## Marianna - Backend
+
+### Next handoff
+
+Review [the proposed frontend API contract](frontend/README.md#proposed-api-contract-for-marianna-to-review) before implementing or adapting endpoints. Confirm course IDs, validation rules, response shapes, session cookies and CSRF protection with Malak. The frontend includes an API adapter, but no backend is implemented in this branch. Backend completion has not yet been reported.
 
 ### Tasks
 
@@ -62,6 +79,10 @@ This is the team's first implementation milestone. The remaining account-managem
 - [ ] The available-courses endpoint returns the agreed active course records.
 
 ## Qingling - Data and Verification
+
+### Next handoff
+
+Start with the demo and [interface verification checklist](frontend/README.md#qinglings-interface-verification). Independently verify both course choices and error cases, and record results. Once Marianna's backend is connected, verify persistence, duplicate-account handling, session invalidation and unauthorized requests against the server. Verification completion has not yet been reported.
 
 ### Tasks
 
@@ -102,6 +123,8 @@ Marianna leads the API agreement, Malak confirms it supports the interface, and 
 5. Demonstrate the complete journey together and review it against the checklist below.
 
 ## Shared feature completion checklist
+
+The shared checklist remains open until the real backend is connected and verified. Malak's demo completion alone does not complete this milestone. Changes are reviewed on `feature/frontend-auth`; merging to `main` is a separate team decision.
 
 - [ ] Register a new learner with a course selection.
 - [ ] Confirm the learner and course are stored correctly.
