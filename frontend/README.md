@@ -36,8 +36,10 @@ Real authentication is connected. See [INTEGRATION.md](INTEGRATION.md) for start
 
 For profiles, sign in and select **View your profile** or your account avatar. See [the F2 handoff](PROFILE_HANDOFF.md) for delivered behavior, proposed API operations and verification tasks. Profile editing currently uses sample data only and resets on full reload.
 
-F1 authentication is integrated and locally tested; independent verification and production hardening remain pending. F2 backend integration remains pending. Discovery is completed with sample data. Messaging is completed locally with sample data; administration is not implemented yet.
+F1 authentication is integrated and locally tested; independent verification and production hardening remain pending. F2 backend integration remains pending. Discovery is completed with sample data. Messaging is completed locally with sample data; administration has a local sample preview with backend integration pending.
 
 F3 discovery is available from the signed-in Discover navigation. It uses fictional profiles; see [DISCOVERY_HANDOFF.md](DISCOVERY_HANDOFF.md) for the backend proposal and checks.
 
 F4 sample messaging is available from Messages or a Discover profile. See [MESSAGING_HANDOFF.md](MESSAGING_HANDOFF.md) for demo controls, limitations and backend assignments. Conversations reset on reload.
+
+F5 sample administration is available through **Admin preview**. Select the sample administrator role to review the screens. See [ADMIN_HANDOFF.md](ADMIN_HANDOFF.md) for scope, integration gaps and team assignments.
