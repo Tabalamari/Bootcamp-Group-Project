@@ -31,7 +31,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F6 Account settings: name, course and password changes | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
 
@@ -101,7 +101,7 @@ Registration, course selection, login, a welcome screen and logout are available
 
 Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
 
-Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is completed with sample data; F6 account settings is next. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
+Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is completed with sample data; F6 account settings is completed with sample data. Next: frontend review, backend integration and independent verification. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
 
 ### Tasks
 
@@ -200,7 +200,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `feature/frontend-administration`, published to origin and retained as the local checkout. F5 includes the preceding F4, F3, F2 and F1 integration commits; application changes have not been merged into main.
+F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `feature/frontend-account-settings`, published to origin and retained as the local checkout. F6 includes the preceding F5, F4, F3, F2 and F1 integration commits; application changes have not been merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -231,9 +231,9 @@ The feature is complete when all three contributions work together and the share
 - Marianna: implement authenticated discovery/detail queries, managed options, pagination and server-side privacy/eligibility checks.
 - Qingling: independently verify filtering/fit evidence, then real data and privacy after backend integration.
 - Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
-- F3 is published to origin/feature/frontend-discovery. The current local working branch is feature/frontend-administration. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
+- F3 is published to origin/feature/frontend-discovery. The current local working branch is feature/frontend-account-settings. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
-- Malak next: F6 account settings on a new branch when started; integrate F2-F5 as backend endpoints become available.
+- Malak next: review all frontend features and integrate F2-F6 as backend endpoints become available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
 
 - Design: restored the left sidebar on desktop/laptop and compact mobile navigation.
@@ -255,5 +255,16 @@ The feature is complete when all three contributions work together and the share
 - Limits: isolated sample admin workspace; changes reset on reload and do not propagate to learner screens or real accounts. Role switch is preview-only, not server authorization. Session revocation and cross-screen managed data integration remain pending.
 - Marianna: protected administration APIs, stable managed IDs, reference preservation, persistence, role enforcement, session revocation and learner API integration.
 - Qingling: independent admin workflow, inactive-reference, duplicate and responsive checks; verify direct API authorization, persistence and suspension across learner screens after integration.
-- Malak next: F6 account settings after F5 review; connect F5 when backend is available.
+- Malak next: frontend review and F2-F6 integration as backend endpoints become available.
 - Handoff: [F5 administration handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-administration/frontend/ADMIN_HANDOFF.md). F5 is published to origin/feature/frontend-administration; only this tracker is updated on main. Application changes are not merged into main.
+
+
+## F6 frontend completion - 5 October 2026
+
+- Malak: completed and published on feature/frontend-account-settings. Sample name/course updates, save/cancel, field validation, current-password confirmation, new-password confirmation, visibility toggle, sensitive-field clearing and retry.
+- Checks: 18 tests and build passed; browser name/course/save/cancel/retry/password flows passed; no overflow at 320/390/1024/1440px; desktop/mobile visually reviewed.
+- Limits: isolated temporary preview; real account, password, profile/header and discovery remain unchanged. Current-password verification is simulated, not server reauthentication.
+- Marianna: authenticated account/password endpoints, active-course validation, secure password verification/change and session policy; keep shared profile/account state consistent.
+- Qingling: independent form checks, then persistence, real password login, session handling, authorization and cross-screen consistency after integration.
+- Malak next: frontend review and integration as backend endpoints become available.
+- Handoff: [F6 account settings handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-account-settings/frontend/SETTINGS_HANDOFF.md). F6 is published to origin/feature/frontend-account-settings. Only this tracker is updated on main; application changes are not merged into main.
