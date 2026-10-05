@@ -1,6 +1,6 @@
 # Bootcamp Connect frontend
 
-Malak's first feature: registration, course selection, login, welcome screen and logout. React + JavaScript, Vite, and Tailwind CSS. Responsive desktop, laptop and mobile layouts follow the approved blue mockup.
+Malak's frontend features: registration, course selection, login, welcome screen, logout, and profile viewing/editing with photo controls. React + JavaScript, Vite, and Tailwind CSS. Responsive desktop, laptop and mobile layouts follow the approved blue mockup.
 
 ## Run
 
@@ -16,25 +16,13 @@ Open the local address printed in the terminal. Run `npm test` for validation/de
 
 ## Demo mode
 
-Demo mode is enabled by default and clearly labelled. Use fictional details. Sample login: `malak@example.com` / `DemoPass123!`.
+Real authentication is enabled by default. To use the standalone demo, set `VITE_DEMO_MODE=true` and restart Vite. Demo mode is clearly labelled. Use fictional details. Sample login: `malak@example.com` / `DemoPass123!`.
 
-Registration creates a temporary account that can be used to log in again after logout. All accounts and the session reset on a full page reload. Passwords are held only in temporary memory; nothing is stored in browser storage. This is an interface demonstration, not secure authentication. Real sessions, persistence, permissions and password handling belong to the backend.
+In standalone demo mode, registration creates a temporary account that can be used to log in again after logout. All accounts and the session reset on a full page reload. Passwords are held only in temporary memory; nothing is stored in browser storage. This is an interface demonstration, not secure authentication. Real sessions, persistence, permissions and password handling belong to the backend.
 
-## Proposed API contract for Marianna to review
+## Backend integration
 
-This contract is a frontend integration proposal, not an agreed or implemented backend. The course IDs and 8-character registration password minimum are provisional.
-
-| Method | Path | Request | Success response |
-| --- | --- | --- | --- |
-| GET | `/api/courses` | None | `[{ "id": "software-development", "name": "Software development" }, ...]` |
-| GET | `/api/auth/session` | Session cookie | `{ "user": User }`; 401 if signed out |
-| POST | `/api/auth/register` | `{ displayName, email, password, courseId }` | `{ "user": User }` and session cookie |
-| POST | `/api/auth/login` | `{ email, password }` | `{ "user": User }` and session cookie |
-| POST | `/api/auth/logout` | Session cookie | 204; session invalidated |
-
-`User` contains `id`, `displayName`, `email`, and `courseId`. Errors use an appropriate HTTP status with `{ "message": "User-facing explanation" }`. Never return password credentials.
-
-To connect the backend, copy `.env.example` to `.env.local`, set `VITE_DEMO_MODE=false`, and run Marianna's API on port 3000. Vite proxies `/api` locally. Hosted environments need a same-origin API route or explicitly configured credentialed CORS. Agree secure HttpOnly cookie configuration and CSRF protection with Marianna. Client-side screen gating is not server authorization. Never put backend secrets in `VITE_*` variables.
+Real authentication is connected. See [INTEGRATION.md](INTEGRATION.md) for startup instructions, the actual API contract, test results and remaining work. The earlier proposed cookie-based API is superseded by Marianna's bearer-token API.
 
 ## Qingling's interface verification
 
@@ -46,4 +34,6 @@ To connect the backend, copy `.env.example` to `.env.local`, set `VITE_DEMO_MODE
 - Check password visibility, keyboard navigation, and 320px, 390px, 1024px and 1440px layouts.
 - With the real API connected, verify course-loading retry, failed requests, session restoration, and server-enforced authorization.
 
-Backend integration and end-to-end security checks remain pending. This feature does not yet implement profile editing, discovery, messaging, or administration.
+For profiles, sign in and select **View your profile** or your account avatar. See [the F2 handoff](PROFILE_HANDOFF.md) for delivered behavior, proposed API operations and verification tasks. Profile editing currently uses sample data only and resets on full reload.
+
+F1 authentication is integrated and locally tested; independent verification and production hardening remain pending. F2 backend integration remains pending. Discovery, messaging and administration are not implemented yet.

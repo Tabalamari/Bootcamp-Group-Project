@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client';
 import { auth, isDemo } from './authService';
 import { validateAuth } from './validation';
 import './styles.css';
+import Profile, { Avatar } from './Profile';
+import { profileService } from './profileService';
 
 function App() {
-  const [page, setPage] = useState(location.hash === '#login' ? 'login' : 'register');
+  const [page, setPage] = useState(location.hash === '#profile' ? 'profile' : location.hash === '#login' ? 'login' : 'register');
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
   const [courses, setCourses] = useState([]);
@@ -18,6 +20,8 @@ function App() {
   const [failure, setFailure] = useState('');
   const formRef = useRef(null);
   const registering = page === 'register';
+  const [profilePhoto, setProfilePhoto] = useState('');
+  useEffect(() => { let active = true; setProfilePhoto(''); if (user) profileService.get(user).then(profile => { if (active) { setProfilePhoto(profile.photo); setUser(u => u ? { ...u, displayName: profile.displayName } : u); } }); return () => { active = false; }; }, [user?.id]);
 
   async function loadCourses() {
     setCourseError('');
@@ -32,7 +36,7 @@ function App() {
   useEffect(() => { start(); loadCourses(); }, []);
   useEffect(() => {
     function navigate() {
-      setPage(location.hash === '#register' ? 'register' : 'login');
+      setPage(location.hash === '#profile' ? 'profile' : location.hash === '#register' ? 'register' : 'login');
       setErrors({}); setFailure(''); setValues(v => ({ ...v, password: '' }));
     }
     window.addEventListener('hashchange', navigate);
@@ -75,12 +79,13 @@ function App() {
   return <div className="min-h-screen bg-[#f3f7fd] text-[#183252]">
     <header className="site-header flex flex-wrap items-center justify-between gap-4">
       <a className="brand flex items-center gap-3" href={user ? '#welcome' : '#register'} aria-label="Bootcamp Connect home"><span className="brand-mark">bc</span><span>bootcamp connect</span></a>
-      {user ? <div className="flex items-center gap-3"><span className="hidden sm:inline">{user.displayName}</span><span className="avatar" aria-hidden="true">{user.displayName.charAt(0).toUpperCase()}</span><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
+      {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span><Avatar photo={profilePhoto} name={user.displayName} /></a><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
+    {!isDemo && user && <div className="demo-banner">Account connected to the backend · Profile edits are still a temporary demo and reset on reload.</div>}
     <main className="page-wrap">
       {!ready ? <section className="form-card mx-auto max-w-lg" aria-live="polite"><h1>Getting things ready…</h1>{failure && <><p role="alert" className="error-banner">{failure}</p><button className="primary" onClick={start}>Try again</button></>}</section> : user ?
-        <section className="welcome-card mx-auto max-w-3xl"><span className="eyebrow">YOU’RE PART OF THE COMMUNITY</span><h1>Welcome, {user.displayName}.</h1><p className="intro">Your next chapter starts with a connection.</p><div className="account-details"><p><span>Your course</span><strong>{courses.find(c => c.id === user.courseId)?.name || user.courseId}</strong></p><p><span>Your email</span><strong>{user.email}</strong></p></div><p className="text-[#526782]">Your account journey is ready to explore. Profiles, discovery, and messaging are coming in the next features.</p>{failure && <p className="error-banner" role="alert">{failure}</p>}</section> :
+        (page === 'profile' ? <Profile key={user.id} user={user} courses={courses} onSaved={profile => { setProfilePhoto(profile.photo); setUser(u => ({ ...u, displayName: profile.displayName })); }} /> : <section className="welcome-card mx-auto max-w-3xl"><span className="eyebrow">YOU’RE PART OF THE COMMUNITY</span><h1>Welcome, {user.displayName}.</h1><p className="intro">Your next chapter starts with a connection.</p><div className="account-details"><p><span>Your course</span><strong>{courses.find(c => c.id === user.courseId)?.name || user.courseId}</strong></p><p><span>Your email</span><strong>{user.email}</strong></p></div><p className="text-[#526782]">Add your skills, interests and goals so your community can get to know you.</p>{<a className="primary profile-start" href="#profile">View your profile →</a>}{failure && <p className="error-banner" role="alert">{failure}</p>}</section>) :
         <div className="auth-layout">
           <aside className="story"><span className="eyebrow">YOUR BOOTCAMP. YOUR PEOPLE.</span><h2>Good things start<br className="hidden lg:block" /> with a hello.</h2><p>Meet the people learning alongside you. Find complementary skills, share ideas, and build something together.</p><img src="/community-hero.webp" alt="Bootcamp learners collaborating around a laptop" width="1448" height="1086" /><div className="story-note"><span className="note-dot" /> Software minds. Business ideas. Shared ambition.</div></aside>
           <section className="form-card"><div className="eyebrow">{registering ? 'JOIN THE COMMUNITY' : 'WELCOME BACK'}</div><h1>{registering ? 'Let’s get you connected.' : 'Your community awaits.'}</h1><p className="intro">{registering ? 'Create your account and find your people.' : 'Sign in to pick up where you left off.'}</p>
