@@ -43,3 +43,5 @@ F3 discovery is available from the signed-in Discover navigation. It uses fictio
 F4 sample messaging is available from Messages or a Discover profile. See [MESSAGING_HANDOFF.md](MESSAGING_HANDOFF.md) for demo controls, limitations and backend assignments. Conversations reset on reload.
 
 F5 sample administration is available through **Admin preview**. Select the sample administrator role to review the screens. See [ADMIN_HANDOFF.md](ADMIN_HANDOFF.md) for scope, integration gaps and team assignments.
+
+F6 is available from **Account settings** as an isolated sample preview. Use fictional passwords only. See [SETTINGS_HANDOFF.md](SETTINGS_HANDOFF.md) for instructions and backend assignments. Real account/password updates are pending integration.
