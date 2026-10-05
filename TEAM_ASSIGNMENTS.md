@@ -27,7 +27,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
-| F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
@@ -72,6 +72,22 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Malak: F3 and F4 sample frontends are now complete; connect F2 when its backend is ready.
 - Marianna next: profile/options endpoints, persistent relationships, ownership rules, photo storage/upload/removal and consistent Save/Cancel behavior.
 - Qingling next: independently verify profile fields, user isolation, file errors, save/cancel and responsive layouts; verify real persistence and authorization after integration.
+
+### F2 - Backend completed on 5 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - Persistent SQLite tables: `skills`, `interests`, `connection_goals`, `profiles`, `profile_skills`, `profile_interests`, `profile_goals` with foreign key integrity, cascade deletion, and seed data matching Malak's frontend vocabulary.
+  - Endpoints implemented:
+    - `GET /api/profile-options` (and `/api/profile/options`): returns active vocabulary for skills, interests, and goals.
+    - `GET /api/profiles/me` (and `/api/profile/me`): returns authenticated learner profile with display name, course, bio, photoUrl or null, and selected options.
+    - `PATCH /api/profiles/me` (and `/api/profile/me`, `PUT`): atomic transaction updating display name, bio, skills, interests, and goals with validation (name length 2-80, bio max 500, vocabulary checks).
+    - `POST /api/profiles/me/photo`: multipart upload via `multer` with format checks (JPG, PNG, WebP only) and 5 MB size limit.
+    - `DELETE /api/profiles/me/photo`: removes photo file from disk and resets database photoUrl to null.
+    - `GET /api/profiles/:userId`: public profile view for other learners, strictly excluding email, password_hash, role, and private fields; blocks suspended users.
+- Checks: 27 automated tests passing in [backend/test.js](backend/test.js) covering all 7 FR-02 acceptance criteria.
+- Qingling next: independently verify profile fields, persistence across sessions, file errors, and direct unauthorized requests.
+- Malak next: connect frontend `profileService.js` to real backend endpoints.
 
 ### Record for each subsequent completed frontend feature
 
