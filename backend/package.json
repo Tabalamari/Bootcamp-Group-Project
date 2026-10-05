@@ -8,13 +8,20 @@
     "dev": "node --watch server.js",
     "test": "node test.js"
   },
-  "keywords": ["bootcamp", "backend", "express", "sqlite", "auth"],
+  "keywords": [
+    "bootcamp",
+    "backend",
+    "express",
+    "sqlite",
+    "auth"
+  ],
   "author": "Marianna",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "multer": "^2.4.0"
   }
 }
