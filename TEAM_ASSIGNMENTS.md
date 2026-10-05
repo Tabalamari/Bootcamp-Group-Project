@@ -26,7 +26,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
-| F1 Registration, login, course selection and logout | **Done (sample data)**, 4 Oct 2026; `feature/frontend-auth`, commit `3fd1d61` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F1 Registration, login, course selection and logout | **Done (sample data)**, 4 Oct 2026; `feature/frontend-auth`, commit `3fd1d61` | **Done**, 4 Oct 2026; `backend/`, commit `8ea04f8` | Awaiting confirmation | Pending integration |
 | F2 Profile viewing/editing and profile photos | Not started; next frontend feature | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F4 Conversations, messages and unread indicators | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
