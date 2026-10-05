@@ -1,6 +1,6 @@
 # F5 — Administration frontend handoff
 
-Published branch: `codex/frontend-administration`, based on F4 commit `86ca2f5`. F5 is pushed to origin with its preceding feature dependencies. Application changes are not merged into main; only the tracker is updated there.
+Published branch: `feature/frontend-administration`, based on F4 commit `86ca2f5`. F5 is pushed to origin with its preceding feature dependencies. Application changes are not merged into main; only the tracker is updated there.
 
 ## Using the preview
 
