@@ -4,10 +4,11 @@ import { auth, isDemo } from './authService';
 import { validateAuth } from './validation';
 import './styles.css';
 import Profile, { Avatar } from './Profile';
+import Discovery from './Discovery';
 import { profileService } from './profileService';
 
 function App() {
-  const [page, setPage] = useState(location.hash === '#profile' ? 'profile' : location.hash === '#login' ? 'login' : 'register');
+  const [page, setPage] = useState(location.hash === '#discover' ? 'discover' : location.hash === '#profile' ? 'profile' : location.hash === '#login' ? 'login' : 'register');
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
   const [courses, setCourses] = useState([]);
@@ -36,7 +37,7 @@ function App() {
   useEffect(() => { start(); loadCourses(); }, []);
   useEffect(() => {
     function navigate() {
-      setPage(location.hash === '#profile' ? 'profile' : location.hash === '#register' ? 'register' : 'login');
+      setPage(location.hash === '#discover' ? 'discover' : location.hash === '#profile' ? 'profile' : location.hash === '#register' ? 'register' : 'login');
       setErrors({}); setFailure(''); setValues(v => ({ ...v, password: '' }));
     }
     window.addEventListener('hashchange', navigate);
@@ -83,9 +84,11 @@ function App() {
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
     {!isDemo && user && <div className="demo-banner">Account connected to the backend · Profile edits are still a temporary demo and reset on reload.</div>}
+    <div className={user ? "signed-in-layout" : "signed-out-layout"}>
+    {user && <nav className="community-nav" aria-label="Community"><span className="sidebar-label">YOUR COMMUNITY</span><a href="#welcome" aria-current={!["profile","discover"].includes(page) ? "page" : undefined}>Welcome</a><a href="#discover" aria-current={page === "discover" ? "page" : undefined}>Discover</a><a href="#profile" aria-current={page === "profile" ? "page" : undefined}>My profile</a></nav>}
     <main className="page-wrap">
       {!ready ? <section className="form-card mx-auto max-w-lg" aria-live="polite"><h1>Getting things ready…</h1>{failure && <><p role="alert" className="error-banner">{failure}</p><button className="primary" onClick={start}>Try again</button></>}</section> : user ?
-        (page === 'profile' ? <Profile key={user.id} user={user} courses={courses} onSaved={profile => { setProfilePhoto(profile.photo); setUser(u => ({ ...u, displayName: profile.displayName })); }} /> : <section className="welcome-card mx-auto max-w-3xl"><span className="eyebrow">YOU’RE PART OF THE COMMUNITY</span><h1>Welcome, {user.displayName}.</h1><p className="intro">Your next chapter starts with a connection.</p><div className="account-details"><p><span>Your course</span><strong>{courses.find(c => c.id === user.courseId)?.name || user.courseId}</strong></p><p><span>Your email</span><strong>{user.email}</strong></p></div><p className="text-[#526782]">Add your skills, interests and goals so your community can get to know you.</p>{<a className="primary profile-start" href="#profile">View your profile →</a>}{failure && <p className="error-banner" role="alert">{failure}</p>}</section>) :
+        (page === 'discover' ? <Discovery key={user.id} user={user} /> : page === 'profile' ? <Profile key={user.id} user={user} courses={courses} onSaved={profile => { setProfilePhoto(profile.photo); setUser(u => ({ ...u, displayName: profile.displayName })); }} /> : <section className="welcome-card mx-auto max-w-3xl"><span className="eyebrow">YOU’RE PART OF THE COMMUNITY</span><h1>Welcome, {user.displayName}.</h1><p className="intro">Your next chapter starts with a connection.</p><div className="account-details"><p><span>Your course</span><strong>{courses.find(c => c.id === user.courseId)?.name || user.courseId}</strong></p><p><span>Your email</span><strong>{user.email}</strong></p></div><p className="text-[#526782]">Add your skills, interests and goals so your community can get to know you.</p>{<a className="primary profile-start" href="#profile">View your profile →</a>}{failure && <p className="error-banner" role="alert">{failure}</p>}</section>) :
         <div className="auth-layout">
           <aside className="story"><span className="eyebrow">YOUR BOOTCAMP. YOUR PEOPLE.</span><h2>Good things start<br className="hidden lg:block" /> with a hello.</h2><p>Meet the people learning alongside you. Find complementary skills, share ideas, and build something together.</p><img src="/community-hero.webp" alt="Bootcamp learners collaborating around a laptop" width="1448" height="1086" /><div className="story-note"><span className="note-dot" /> Software minds. Business ideas. Shared ambition.</div></aside>
           <section className="form-card"><div className="eyebrow">{registering ? 'JOIN THE COMMUNITY' : 'WELCOME BACK'}</div><h1>{registering ? 'Let’s get you connected.' : 'Your community awaits.'}</h1><p className="intro">{registering ? 'Create your account and find your people.' : 'Sign in to pick up where you left off.'}</p>
@@ -104,7 +107,7 @@ function App() {
             {isDemo && !registering && <div className="demo-details"><strong>Try the sample account</strong><span>malak@example.com</span><span>Password: DemoPass123!</span></div>}
           </section>
         </div>}
-    </main><footer className="site-footer">Bootcamp Connect <span>Learn together. Build together.</span></footer>
+    </main></div><footer className="site-footer">Bootcamp Connect <span>Learn together. Build together.</span></footer>
   </div>;
 }
 
