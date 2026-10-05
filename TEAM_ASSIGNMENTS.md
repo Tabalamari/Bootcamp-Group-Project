@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 4 October 2026
+Last updated: 5 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-05
 
@@ -26,6 +26,9 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
+| F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
+| F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F3 Discovery, filters and fit explanations | In progress on local `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F1 Registration, login, course selection and logout | **Done (sample data)**, 4 Oct 2026; `feature/frontend-auth`, commit `3fd1d61` | **Done**, 4 Oct 2026; `backend/`, commit `8ea04f8` | Awaiting confirmation | Pending integration |
 | F2 Profile viewing/editing and profile photos | Not started; next frontend feature | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
@@ -33,7 +36,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F5 Administration: users, courses, categories, skills and interests | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
-F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. No backend or independent verification completion is claimed by this tracker.
+F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
 
 ## Assignments for the remaining features
 
@@ -51,15 +54,27 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 
 ### F1 - Frontend completed on 4 October 2026
 
-- Owner: Malak. Implementation: [frontend/](https://github.com/Tabalamari/Bootcamp-Group-Project/tree/feature/frontend-auth/frontend).
+- Owner: Malak. Implementation: frontend/ (local file: `frontend/`; latest F2/F3 files are not pushed).
 - Delivered: registration, course selection, login, welcome screen, logout and responsive blue styling.
 - Checks: production build; three validation/demo-service tests; browser journey checks; overflow checks at 320, 390, 1024 and 1440 pixels; desktop/mobile visual review.
 - Limitation: sample accounts and session are temporary; refresh resets them. No real authentication, persistent database or server authorization is implemented.
-- Handoff: [setup, proposed API contract and verification checklist](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-auth/frontend/README.md).
+- Handoff: setup, proposed API contract and verification checklist (local file: `frontend/README.md`; latest F2/F3 files are not pushed).
 - Branch: `feature/frontend-auth`; implementation commit `3fd1d61` pushed to origin. Merge approval remains pending.
-- Malak next: start F2 independently, then connect F1 when the backend is available.
-- Marianna next: review F1's API proposal and implement account/session/course operations.
+- Updated 5 Oct: F1 is connected and tested locally; F2 is completed with sample data.
+- Updated 5 Oct: Marianna implemented F1. Review the integration fixes and remaining backend hardening tasks below.
 - Qingling next: independently verify the demo; prepare course/test data; verify the integrated backend when available.
+
+### F2 - Frontend completed on 5 October 2026
+
+- Owner: Malak. Implementation: `frontend/src/Profile.jsx` and `frontend/src/profileService.js`.
+- Delivered: profile viewing/editing, name/bio, skills/interests/goals, read-only course, native photo picker, edit/remove controls with bin icon, enlarged photo view, save/cancel and header avatar updates.
+- Checks: production build and five automated tests passed; browser checks for save, validation, photo handling, cancellation, signed-out access and 320/390/1024/1440px widths; desktop profile and mobile editor reviewed visually.
+- Limitations: profiles/photos stay in memory and reset on reload; real profile API is not connected. Course changes are assigned to F6. Backend ownership and upload security remain pending.
+- Handoff: F2 API proposal and verification checklist (local file: `frontend/PROFILE_HANDOFF.md`; latest F2/F3 files are not pushed).
+- Branch: `feature/frontend-profile`, based on `feature/frontend-auth` at `3fd1d61`; committed locally as `f79625a`, not pushed; application code remains separate from `main`.
+- Malak next: F3 discovery/filtering/fit explanations, with sample data; connect F2 when the backend is ready.
+- Marianna next: profile/options endpoints, persistent relationships, ownership rules, photo storage/upload/removal and consistent Save/Cancel behavior.
+- Qingling next: independently verify profile fields, user isolation, file errors, save/cancel and responsive layouts; verify real persistence and authorization after integration.
 
 ### Record for each subsequent completed frontend feature
 
@@ -83,13 +98,13 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ### Current status
 
-Frontend demo implemented on `feature/frontend-auth` in [frontend/](https://github.com/Tabalamari/Bootcamp-Group-Project/tree/feature/frontend-auth/frontend). Uses React, JavaScript, Vite and Tailwind CSS with the approved blue design and responsive desktop, laptop and mobile layouts.
+Frontend demo implemented on `feature/frontend-auth` in frontend/ (local file: `frontend/`; latest F2/F3 files are not pushed). Uses React, JavaScript, Vite and Tailwind CSS with the approved blue design and responsive desktop, laptop and mobile layouts.
 
 Registration, course selection, login, a welcome screen and logout are available using temporary sample accounts. Accounts and sessions reset on a page reload. This is frontend demonstration behavior, not real authentication or persistent storage.
 
 Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
 
-Next: proceed with F2 using sample data while Marianna is unavailable. Review the proposed F1 API contract and connect the real backend when she returns. Setup instructions, sample credentials and the proposed API are in [frontend/README.md](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-auth/frontend/README.md).
+Next: F1 is connected locally, F2 is completed with sample data, and F3 discovery is next. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in frontend/README.md (local file: `frontend/README.md`; latest F2/F3 files are not pushed).
 
 ### Tasks
 
@@ -108,14 +123,18 @@ Next: proceed with F2 using sample data while Marianna is unavailable. Review th
 - [x] Invalid inputs and demo authentication errors have understandable feedback.
 - [x] A signed-in demo user reaches the welcome page; signed-out users are gated in the interface.
 - [x] Signing out returns the user to a public screen in demo mode.
-- [ ] Real API error responses and session behavior are verified after integration.
-- [ ] The complete interface works with the real backend.
+- [x] Real API error responses and session behavior are verified locally after integration.
+- [x] The F1 authentication interface works with the real backend; F2 remains a demo.
 
 ## Marianna - Backend
 
 ### Next handoff
 
-Review [the proposed frontend API contract](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-auth/frontend/README.md#proposed-api-contract-for-marianna-to-review) before implementing or adapting endpoints. Confirm course IDs, validation rules, response shapes, session cookies and CSRF protection with Malak. The frontend includes an API adapter, but no backend is implemented in this branch. Backend completion has not yet been reported.
+Marianna's F1 backend is now on `origin/main`. Its [API README](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/main/backend/README.md) was reviewed on 5 October 2026. It documents Node.js/Express, SQLite, bcrypt and bearer-token sessions. This differs from the earlier PostgreSQL plan and cookie-based frontend proposal; confirm the database choice with the team.
+
+Completed integration: use returned tokens in `Authorization: Bearer ...`, restore sessions through `GET /api/auth/me`, read errors from `error`, use course IDs from the API (`software-dev`, `business-dev`), and handle the logout JSON response. The frontend adapter now uses this API and real authentication is the default. F2 remains a labelled profile demo until profile endpoints exist.
+
+Qingling should run and independently review the backend checks, then verify the integrated browser journey, persistence and direct unauthorized requests. Backend execution passed 19 checks; seven frontend tests and the real browser authentication journey passed. This is local integration verification, not a full production security audit.
 
 ### Tasks
 
@@ -130,19 +149,19 @@ Review [the proposed frontend API contract](https://github.com/Tabalamari/Bootca
 
 ### Done when
 
-- [ ] Valid registration creates a persistent learner account with the correct course.
-- [ ] Duplicate emails and invalid registration data are rejected.
-- [ ] Valid credentials create an authenticated session; incorrect credentials fail.
-- [ ] Sessions support the frontend's agreed authentication flow.
-- [ ] Sign-out invalidates the session.
-- [ ] Signed-out requests cannot access protected data.
-- [ ] The available-courses endpoint returns the agreed active course records.
+- [x] Valid registration creates a persistent learner account with the correct course.
+- [x] Duplicate emails and invalid registration data are rejected.
+- [x] Valid credentials create an authenticated session; incorrect credentials fail.
+- [x] Sessions support the frontend's agreed authentication flow.
+- [x] Sign-out invalidates the session.
+- [x] Signed-out requests cannot access protected data.
+- [x] The available-courses endpoint returns the agreed active course records.
 
 ## Qingling - Data and Verification
 
 ### Next handoff
 
-Start with the demo and [interface verification checklist](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-auth/frontend/README.md#qinglings-interface-verification). Independently verify both course choices and error cases, and record results. Once Marianna's backend is connected, verify persistence, duplicate-account handling, session invalidation and unauthorized requests against the server. Verification completion has not yet been reported.
+F1 is now connected locally. Use the integration handoff (local file: `frontend/INTEGRATION.md`; latest F2/F3 files are not pushed) to run both services and independently verify real registration, courses, persistence, duplicate handling, session restoration and revoked tokens. F2 remains a separate demo. Record results; automated checks do not imply Qingling has completed her assignment.
 
 ### Tasks
 
@@ -184,14 +203,26 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-The shared checklist remains open until the real backend is connected and verified. Malak's demo completion alone does not complete this milestone. Changes are reviewed on `feature/frontend-auth`; merging to `main` is a separate team decision.
+F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `feature/frontend-profile`, based on the authentication branch; it is local only.
 
-- [ ] Register a new learner with a course selection.
-- [ ] Confirm the learner and course are stored correctly.
-- [ ] Sign in and open the protected welcome page.
-- [ ] Sign out and confirm protected access is denied.
-- [ ] Demonstrate clear handling of invalid inputs and duplicate registration.
-- [ ] Confirm the checks pass and record any remaining work.
+- [x] Register a new learner with a course selection.
+- [x] Confirm the learner and course are stored correctly.
+- [x] Sign in and open the protected welcome page.
+- [x] Sign out and confirm protected access is denied.
+- [x] Demonstrate clear handling of invalid inputs and duplicate registration.
+- [x] Confirm the checks pass and record any remaining work.
 - [ ] Commit the implementation and verification results to the shared repository through the team's agreed review process.
 
 The feature is complete when all three contributions work together and the shared checklist passes.
+
+## F1 integration update - 5 October 2026
+
+- Imported Marianna's backend from `origin/main` (`fd384d6`) into the local feature branch without merging or pushing.
+- Connected registration/login, real course IDs, bearer-token session restoration, API errors and server logout. Account data persists in SQLite; F2 profile edits/photos still reset on reload.
+- Fixed malformed register/login input types and isolated backend tests from the development database. Database files are ignored by Git.
+- Passed: 19 backend checks, seven frontend tests, production build and real browser checks for registration, session restoration, login failures, duplicate email, logout token revocation and invalid-session recovery.
+- Marianna: review the small backend changes; add rate limiting, session expiry and remaining F6 account operations before treating full FR-01 as complete. SQLite is the implemented database; any PostgreSQL migration needs a team decision.
+- Qingling: independently verify the integrated feature and record outcomes. Her status remains pending.
+- Malak: review the connected UI, then continue F3; F2 integration awaits profile endpoints.
+- Details and startup instructions: frontend/INTEGRATION.md (local file: `frontend/INTEGRATION.md`; latest F2/F3 files are not pushed).
+- F2 and F1 integration are committed locally on `feature/frontend-profile` (`f79625a`), not pushed. Only this tracker is being shared on main.
