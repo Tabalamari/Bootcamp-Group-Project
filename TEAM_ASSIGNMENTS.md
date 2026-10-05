@@ -29,7 +29,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F4 Conversations, messages and unread indicators | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `codex/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F5 Administration: users, courses, categories, skills and interests | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
@@ -68,8 +68,8 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Checks: production build and five automated tests passed; browser checks for save, validation, photo handling, cancellation, signed-out access and 320/390/1024/1440px widths; desktop profile and mobile editor reviewed visually.
 - Limitations: profiles/photos stay in memory and reset on reload; real profile API is not connected. Course changes are assigned to F6. Backend ownership and upload security remain pending.
 - Handoff: [F2 API proposal and verification checklist](frontend/PROFILE_HANDOFF.md).
-- Branch: `feature/frontend-profile`, based on `feature/frontend-auth` at `3fd1d61`; commit `f79625a` is included in the published F3 branch; the separate F2 branch has not been pushed; application code remains separate from `main`.
-- Malak next: F3 discovery/filtering/fit explanations, with sample data; connect F2 when the backend is ready.
+- Branch: `feature/frontend-profile`, based on `feature/frontend-auth` at `3fd1d61`; commit `f79625a` is included in the published F3 branch; the separate F2 branch is now published to origin; application code remains separate from `main`.
+- Malak: F3 and F4 sample frontends are now complete; connect F2 when its backend is ready.
 - Marianna next: profile/options endpoints, persistent relationships, ownership rules, photo storage/upload/removal and consistent Save/Cancel behavior.
 - Qingling next: independently verify profile fields, user isolation, file errors, save/cancel and responsive layouts; verify real persistence and authorization after integration.
 
@@ -101,7 +101,7 @@ Registration, course selection, login, a welcome screen and logout are available
 
 Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
 
-Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is next. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
+Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is next. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
 
 ### Tasks
 
@@ -200,7 +200,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `feature/frontend-discovery`, published to origin and retained as the local checkout. F3 includes the preceding F2 and F1 integration commits; application changes have not been merged into main.
+F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `codex/frontend-messaging`, published to origin and retained as the local checkout. F4 includes the preceding F3, F2 and F1 integration commits; application changes have not been merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -222,7 +222,7 @@ The feature is complete when all three contributions work together and the share
 - Qingling: independently verify the integrated feature and record outcomes. Her status remains pending.
 - Malak: review the connected UI, then continue F3; F2 integration awaits profile endpoints.
 - Details and startup instructions: [frontend/INTEGRATION.md](frontend/INTEGRATION.md).
-- F2 and F1 integration commit `f79625a` is included in the published F3 branch. The separate F2 branch has not been pushed. Only this tracker update is being shared on main.
+- F2 and F1 integration commit `f79625a` is included in the published F3 branch. The separate F2 branch is now published to origin. Only this tracker update is being shared on main.
 
 ## F3 frontend completion - 5 October 2026
 
@@ -231,11 +231,18 @@ The feature is complete when all three contributions work together and the share
 - Marianna: implement authenticated discovery/detail queries, managed options, pagination and server-side privacy/eligibility checks.
 - Qingling: independently verify filtering/fit evidence, then real data and privacy after backend integration.
 - Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
-- F3 is published to origin/feature/frontend-discovery and remains the local working branch. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
+- F3 is published to origin/feature/frontend-discovery. The current local working branch is codex/frontend-messaging. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
-- Malak next: F4 messaging frontend with sample data, on its own branch when started.
+- Malak next: F5 administration frontend on a new branch when started; integrate F2-F4 as backend endpoints become available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
 
 - Design: restored the left sidebar on desktop/laptop and compact mobile navigation.
-- Malak next: F4 messaging frontend with sample data, on its own branch when started.
 - Tracker reconciliation: consolidated duplicate outdated F1-F3 rows from main; current statuses and Marianna's completed F1 work are retained.
+
+## F4 frontend implementation - 5 October 2026
+
+- Malak: messaging completed and published on codex/frontend-messaging, based on F3 commit 7b1e48d; production build and all 13 frontend tests passed. Browser checks passed for inbox, incoming alerts, read clearing, send, profile initiation, separate histories/drafts, retry, mobile back/reopen and overflow at 320/390/1024/1440px. Desktop and mobile visuals reviewed.
+- Includes conversation list, profile initiation, separate histories/drafts, send/retry, timestamps, sample incoming alerts, unread counts and mobile back navigation.
+- Marianna: persistent messaging APIs, participant authorization, unread/read state, update delivery and duplicate prevention.
+- Qingling: independent message order, isolation, retry, unread and responsive checks; persistence/security checks after integration.
+- Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/codex/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
