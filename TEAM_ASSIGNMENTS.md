@@ -29,7 +29,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `codex/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | Not started | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
@@ -241,11 +241,11 @@ The feature is complete when all three contributions work together and the share
 
 ## F4 frontend implementation - 5 October 2026
 
-- Malak: messaging completed and published on codex/frontend-messaging, based on F3 commit 7b1e48d; production build and all 13 frontend tests passed. Browser checks passed for inbox, incoming alerts, read clearing, send, profile initiation, separate histories/drafts, retry, mobile back/reopen and overflow at 320/390/1024/1440px. Desktop and mobile visuals reviewed.
+- Malak: messaging completed and published on feature/frontend-messaging, based on F3 commit 7b1e48d; production build and all 13 frontend tests passed. Browser checks passed for inbox, incoming alerts, read clearing, send, profile initiation, separate histories/drafts, retry, mobile back/reopen and overflow at 320/390/1024/1440px. Desktop and mobile visuals reviewed.
 - Includes conversation list, profile initiation, separate histories/drafts, send/retry, timestamps, sample incoming alerts, unread counts and mobile back navigation.
 - Marianna: persistent messaging APIs, participant authorization, unread/read state, update delivery and duplicate prevention.
 - Qingling: independent message order, isolation, retry, unread and responsive checks; persistence/security checks after integration.
-- Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/codex/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
+- Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
 
 
 ## F5 frontend completion - 5 October 2026
