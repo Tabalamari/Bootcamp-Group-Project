@@ -1,6 +1,6 @@
 # F4 — Messaging frontend handoff
 
-Published on `codex/frontend-messaging`, based on F3 commit `7b1e48d`. Includes the preceding F3/F2/F1 integration dependencies for review. Application changes are not merged into main; only the tracker is updated there.
+Published on `feature/frontend-messaging`, based on F3 commit `7b1e48d`. Includes the preceding F3/F2/F1 integration dependencies for review. Application changes are not merged into main; only the tracker is updated there.
 
 ## Delivered
 
