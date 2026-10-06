@@ -1,6 +1,6 @@
 /**
  * Automated test suite for Marianna's backend requirements and Qingling's criteria
- * Covers FR-01 (Authentication & Courses) and FR-02 (User Profiles)
+ * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), and FR-03 (Search & Explainable Fit)
  * Usage: npm test
  */
 
@@ -10,7 +10,7 @@ const app = require('./server');
 const db = require('./db');
 
 async function runTests() {
-  console.log('\n=== STARTING BACKEND API TESTS (FR-01 & FR-02) ===\n');
+  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02 & FR-03) ===\n');
 
   // Start server on an ephemeral port
   const server = app.listen(0);
@@ -177,7 +177,6 @@ async function runTests() {
     );
 
     // TEST 12: Initial profile state (Acceptance Criteria 1 & 5)
-    // Missing photo uses null/placeholder and does not prevent profile view
     const resInitialProfile = await fetch(`${baseUrl}/profiles/me`, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
@@ -223,7 +222,6 @@ async function runTests() {
     );
 
     // TEST 14: Persistence across re-login (Acceptance Criterion 3)
-    // Logout and login again; verify updated profile retains changes
     await fetch(`${baseUrl}/auth/logout`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${authToken}` }
@@ -287,7 +285,7 @@ async function runTests() {
     // TEST 18: Photo upload - valid PNG (Acceptance Criteria 1 & 6)
     const photoFormData = new FormData();
     const fakeImageBuffer = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG magic header
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
       0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
     ]);
     const imageBlob = new Blob([fakeImageBuffer], { type: 'image/png' });
@@ -330,7 +328,6 @@ async function runTests() {
 
     // TEST 21: Photo upload - oversized file (> 5 MB) (Acceptance Criterion 6)
     const oversizedFormData = new FormData();
-    // 5.2 MB buffer
     const largeBlob = new Blob([new Uint8Array(5.2 * 1024 * 1024)], { type: 'image/jpeg' });
     oversizedFormData.append('photo', largeBlob, 'huge.jpg');
 
@@ -356,7 +353,6 @@ async function runTests() {
     );
 
     // TEST 23: Public profile view by another user (Acceptance Criteria 4 & 7)
-    // Register second user to inspect first user's public profile
     const secondUser = {
       displayName: 'Second Learner',
       email: 'test_second@example.com',
@@ -383,8 +379,9 @@ async function runTests() {
       publicProfile.bio === updatePayload.bio &&
       Array.isArray(publicProfile.skills) &&
       Array.isArray(publicProfile.interests) &&
-      Array.isArray(publicProfile.goals),
-      'TEST 23: GET /api/profiles/:userId returns public profile fields for other learners'
+      Array.isArray(publicProfile.goals) &&
+      Array.isArray(publicProfile.fitReasons),
+      'TEST 23: GET /api/profiles/:userId returns public profile fields and fitReasons for other learners'
     );
 
     // TEST 24: Privacy check - verify private fields are excluded (Acceptance Criterion 7)
@@ -416,11 +413,264 @@ async function runTests() {
       'TEST 26: Suspended account profiles are inaccessible to other learners (403 Forbidden)'
     );
 
+    // Restore test user to active status for Discovery tests
+    db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(testUserId);
+
     // TEST 27: Unauthenticated profile requests return 401
     const resUnauthProfile = await fetch(`${baseUrl}/profiles/me`);
     assert(
       resUnauthProfile.status === 401,
       'TEST 27: GET /api/profiles/me rejects unauthenticated requests (401 Unauthorized)'
+    );
+
+    // =========================================================
+    // FR-03: SEARCH AND EXPLAINABLE FIT (DISCOVERY)
+    // =========================================================
+
+    // Setup candidate fixtures for Discovery testing
+    // Candidate 1: Amara Lewis (business-dev, Sustainability, Project collaboration)
+    const amaraUser = {
+      displayName: 'Amara Lewis',
+      email: 'test_amara@example.com',
+      password: 'StrongPassword123!',
+      courseId: 'business-dev'
+    };
+    const resAmara = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(amaraUser)
+    });
+    const amaraData = await resAmara.json();
+    await fetch(`${baseUrl}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${amaraData.token}` },
+      body: JSON.stringify({
+        bio: 'Turning a sustainable shopping idea into a useful first product. Looking for a developer.',
+        skills: ['Market research', 'Product strategy'],
+        interests: ['Sustainability', 'Technology'],
+        goals: ['Project collaboration']
+      })
+    });
+
+    // Candidate 2: Daniel Park (software-dev, React, Accessibility, Design, Peer support)
+    const danielUser = {
+      displayName: 'Daniel Park',
+      email: 'test_daniel@example.com',
+      password: 'StrongPassword123!',
+      courseId: 'software-dev'
+    };
+    const resDaniel = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(danielUser)
+    });
+    const danielData = await resDaniel.json();
+    await fetch(`${baseUrl}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${danielData.token}` },
+      body: JSON.stringify({
+        bio: 'Frontend learner interested in accessible experiences.',
+        skills: ['React', 'Accessibility'],
+        interests: ['Education', 'Design'],
+        goals: ['Peer support']
+      })
+    });
+
+    // Candidate 3: Sofia Ahmed (business-dev, Marketing, Entrepreneurship, Friendship)
+    const sofiaUser = {
+      displayName: 'Sofia Ahmed',
+      email: 'test_sofia@example.com',
+      password: 'StrongPassword123!',
+      courseId: 'business-dev'
+    };
+    const resSofia = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sofiaUser)
+    });
+    const sofiaData = await resSofia.json();
+    await fetch(`${baseUrl}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sofiaData.token}` },
+      body: JSON.stringify({
+        bio: 'Exploring ideas and looking for friendship.',
+        skills: ['Marketing'],
+        interests: ['Entrepreneurship'],
+        goals: ['Friendship']
+      })
+    });
+
+    // Candidate 4: Suspended User (must never appear in discovery)
+    const suspendedUser = {
+      displayName: 'Suspended Member',
+      email: 'test_suspended_discovery@example.com',
+      password: 'StrongPassword123!',
+      courseId: 'software-dev'
+    };
+    const resSusp = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(suspendedUser)
+    });
+    const suspData = await resSusp.json();
+    db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(suspData.user.id);
+
+    // TEST 28: Full Discovery List - Exclusion of self and suspended accounts (Acceptance Criterion 5)
+    // Logged in as testUser (Alex Rivers, software-dev)
+    const resAllDiscovery = await fetch(`${baseUrl}/profiles`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const allDiscoveryData = await resAllDiscovery.json();
+    const candidateIds = allDiscoveryData.profiles.map(p => p.id);
+
+    assert(
+      resAllDiscovery.status === 200 &&
+      !candidateIds.includes(testUserId) &&
+      !candidateIds.includes(suspData.user.id) &&
+      candidateIds.includes(amaraData.user.id) &&
+      candidateIds.includes(danielData.user.id) &&
+      candidateIds.includes(sofiaData.user.id),
+      'TEST 28: GET /api/profiles returns active community members while strictly excluding self and suspended users'
+    );
+
+    // TEST 29: Clear filters recovers full list (Acceptance Criterion 3)
+    assert(
+      allDiscoveryData.pagination.total >= 4 &&
+      allDiscoveryData.profiles.length === allDiscoveryData.pagination.total,
+      'TEST 29: Default request without filter parameters returns full eligible community list'
+    );
+
+    // TEST 30: Course filter (Acceptance Criterion 1)
+    const resCourseFilter = await fetch(`${baseUrl}/profiles?courseId=business-dev`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const courseFilterData = await resCourseFilter.json();
+    const allBusiness = courseFilterData.profiles.every(p => p.courseId === 'business-dev');
+    assert(
+      resCourseFilter.status === 200 && allBusiness && courseFilterData.profiles.length >= 2,
+      'TEST 30: Course filter correctly returns only participants from selected course'
+    );
+
+    // TEST 31: Single skill filter (Acceptance Criterion 1)
+    const resSkillFilter = await fetch(`${baseUrl}/profiles?skills=Accessibility`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const skillFilterData = await resSkillFilter.json();
+    assert(
+      resSkillFilter.status === 200 &&
+      skillFilterData.profiles.length === 1 &&
+      skillFilterData.profiles[0].displayName === 'Daniel Park',
+      'TEST 31: Single skill filter returns users possessing the requested skill'
+    );
+
+    // TEST 32: Multiple selections within group combine with OR (Acceptance Criterion 2)
+    const resOrFilter = await fetch(`${baseUrl}/profiles?skills=Accessibility,Marketing`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const orFilterData = await resOrFilter.json();
+    const orNames = orFilterData.profiles.map(p => p.displayName);
+    assert(
+      resOrFilter.status === 200 &&
+      orNames.includes('Daniel Park') &&
+      orNames.includes('Sofia Ahmed'),
+      'TEST 32: Multiple selections within skill group combine with OR logic'
+    );
+
+    // TEST 33: Different filter groups combine with AND (Acceptance Criterion 2)
+    // courseId=business-dev AND interests=Sustainability -> should match Amara Lewis only
+    const resAndFilter = await fetch(`${baseUrl}/profiles?courseId=business-dev&interests=Sustainability`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const andFilterData = await resAndFilter.json();
+    assert(
+      resAndFilter.status === 200 &&
+      andFilterData.profiles.length === 1 &&
+      andFilterData.profiles[0].displayName === 'Amara Lewis',
+      'TEST 33: Different filter groups (course AND interest) combine with AND logic'
+    );
+
+    // TEST 34: Text search query across name, bio, skills, and interests
+    const resQuerySearch = await fetch(`${baseUrl}/profiles?query=sustainable`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const querySearchData = await resQuerySearch.json();
+    assert(
+      resQuerySearch.status === 200 &&
+      querySearchData.profiles.length === 1 &&
+      querySearchData.profiles[0].displayName === 'Amara Lewis',
+      'TEST 34: Text search query finds matches across bio and profile fields'
+    );
+
+    // TEST 35: Factual evidence-based fit explanation (Acceptance Criteria 6 & 7)
+    // Viewer: Alex Rivers (software-dev, skills: [React, JavaScript, Node.js], interests: [Technology, Education], goals: [Project collaboration, Co-founder partnership])
+    // Candidate Amara Lewis: (business-dev, interests: [Sustainability, Technology], goals: [Project collaboration])
+    const amaraProfileCard = allDiscoveryData.profiles.find(p => p.id === amaraData.user.id);
+    assert(
+      amaraProfileCard &&
+      Array.isArray(amaraProfileCard.fitReasons) &&
+      amaraProfileCard.fitReasons.some(r => r.includes('Shared interest: Technology')) &&
+      amaraProfileCard.fitReasons.some(r => r.includes('Shared goal: Project collaboration')) &&
+      amaraProfileCard.fitReasons.some(r => r.includes('Different courses, with a shared interest in project collaboration')),
+      'TEST 35: Candidate includes factual fit reasons: shared interest, shared goal, and cross-course collaboration'
+    );
+
+    // TEST 36: Skill in common fit explanation
+    // Candidate Daniel Park has skill 'React' in common with viewer Alex Rivers
+    const danielProfileCard = allDiscoveryData.profiles.find(p => p.id === danielData.user.id);
+    assert(
+      danielProfileCard &&
+      danielProfileCard.fitReasons.some(r => r.includes('Skill in common: React')),
+      'TEST 36: Candidate includes factual fit reasons for shared skills'
+    );
+
+    // TEST 37: Fallback explanation when no criteria match (Acceptance Criterion 8)
+    // Candidate Sofia Ahmed has no shared skills, interests, or goals with Alex Rivers
+    const sofiaProfileCard = allDiscoveryData.profiles.find(p => p.id === sofiaData.user.id);
+    assert(
+      sofiaProfileCard &&
+      sofiaProfileCard.fitReasons.length === 1 &&
+      sofiaProfileCard.fitReasons[0] === 'No shared criteria found yet.',
+      'TEST 37: When no shared criteria exist, fitReasons states "No shared criteria found yet."'
+    );
+
+    // TEST 38: Empty search results state (Acceptance Criterion 9)
+    const resEmpty = await fetch(`${baseUrl}/profiles?query=unmatchable_string_xyz_123`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const emptyData = await resEmpty.json();
+    assert(
+      resEmpty.status === 200 &&
+      Array.isArray(emptyData.profiles) &&
+      emptyData.profiles.length === 0 &&
+      emptyData.pagination.total === 0,
+      'TEST 38: Search yielding no matches returns an empty array with total count 0'
+    );
+
+    // TEST 39: Pagination parameters (page and limit)
+    const resPaged = await fetch(`${baseUrl}/profiles?limit=2&page=1`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const pagedData = await resPaged.json();
+    assert(
+      resPaged.status === 200 &&
+      pagedData.profiles.length === 2 &&
+      pagedData.pagination.limit === 2 &&
+      pagedData.pagination.page === 1 &&
+      pagedData.pagination.totalPages >= 2,
+      'TEST 39: Pagination parameters limit and page return correctly sliced records with pagination metadata'
+    );
+
+    // TEST 40: Discovery privacy guarantee (Acceptance Criterion 7)
+    const allCardsOmitPrivateFields = allDiscoveryData.profiles.every(p =>
+      p.email === undefined &&
+      p.password_hash === undefined &&
+      p.password === undefined &&
+      p.role === undefined &&
+      p.status === undefined
+    );
+    assert(
+      allCardsOmitPrivateFields,
+      'TEST 40: Discovery profiles strictly exclude email, password_hash, role, and private account fields'
     );
 
   } catch (err) {
