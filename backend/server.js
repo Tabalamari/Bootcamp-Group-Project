@@ -583,7 +583,192 @@ app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, 
 });
 
 // -------------------------------------------------------------
-// 11. View Public Profile of Another User (GET /api/profiles/:userId)
+// 11. Discovery: Search and Explainable Fit (GET /api/profiles)
+// -------------------------------------------------------------
+
+// Helper to normalize course IDs
+function normalizeCourseId(courseId) {
+  if (!courseId) return '';
+  const map = {
+    'software-development': 'software-dev',
+    'business-development': 'business-dev'
+  };
+  return map[courseId.toLowerCase()] || courseId.toLowerCase();
+}
+
+// Helper to parse query parameters that may be an array or comma-separated string
+function parseListParam(param) {
+  if (!param) return [];
+  if (Array.isArray(param)) {
+    return param.map(s => String(s).trim()).filter(Boolean);
+  }
+  return String(param).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// Calculate evidence-based fit reasons between candidate and viewer
+function calculateFitReasons(candidate, viewer) {
+  const reasons = [];
+
+  // 1. Shared interests
+  const viewerInterests = (viewer.interests || []).map(s => s.toLowerCase());
+  const sharedInterests = (candidate.interests || []).filter(item => viewerInterests.includes(item.toLowerCase()));
+  if (sharedInterests.length > 0) {
+    reasons.push(`Shared interest: ${sharedInterests.join(', ')}.`);
+  }
+
+  // 2. Shared skills
+  const viewerSkills = (viewer.skills || []).map(s => s.toLowerCase());
+  const sharedSkills = (candidate.skills || []).filter(item => viewerSkills.includes(item.toLowerCase()));
+  if (sharedSkills.length > 0) {
+    reasons.push(`Skill in common: ${sharedSkills.join(', ')}.`);
+  }
+
+  // 3. Shared connection goals
+  const viewerGoals = (viewer.goals || []).map(s => s.toLowerCase());
+  const sharedGoals = (candidate.goals || []).filter(item => viewerGoals.includes(item.toLowerCase()));
+  if (sharedGoals.length > 0) {
+    reasons.push(`Shared goal: ${sharedGoals.join(', ')}.`);
+  }
+
+  // 4. Complementary courses (different courses with shared interest in project collaboration)
+  const normCandCourse = normalizeCourseId(candidate.courseId);
+  const normViewerCourse = normalizeCourseId(viewer.courseId);
+  const candHasProjectCollab = (candidate.goals || []).some(g => g.toLowerCase() === 'project collaboration');
+  const viewerHasProjectCollab = (viewer.goals || []).some(g => g.toLowerCase() === 'project collaboration');
+
+  if (normCandCourse && normViewerCourse && normCandCourse !== normViewerCourse && candHasProjectCollab && viewerHasProjectCollab) {
+    reasons.push('Different courses, with a shared interest in project collaboration.');
+  }
+
+  // 5. Fallback when no criteria match
+  if (reasons.length === 0) {
+    reasons.push('No shared criteria found yet.');
+  }
+
+  return reasons;
+}
+
+// Search and filter community profiles (Discovery)
+app.get('/api/profiles', authMiddleware, (req, res) => {
+  try {
+    const viewer = getUserProfile(req.user.id);
+    if (!viewer) {
+      return res.status(401).json({ error: 'Viewer profile not found' });
+    }
+
+    // Parse filtering parameters
+    const query = (req.query.query || '').trim().toLowerCase();
+    const courseFilter = normalizeCourseId(req.query.courseId);
+    const skillsFilter = parseListParam(req.query.skills).map(s => s.toLowerCase());
+    const interestsFilter = parseListParam(req.query.interests).map(s => s.toLowerCase());
+    const goalsFilter = parseListParam(req.query.goals).map(s => s.toLowerCase());
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 12);
+
+    // Fetch active candidates, strictly excluding current user and suspended accounts
+    const candidateRows = db.prepare(`
+      SELECT users.id 
+      FROM users 
+      WHERE users.status = 'active' AND users.id != ?
+      ORDER BY users.display_name ASC
+    `).all(req.user.id);
+
+    // Hydrate candidates and apply filters
+    const matched = [];
+    for (const row of candidateRows) {
+      const candidate = getUserProfile(row.id);
+      if (!candidate) continue;
+
+      // Filter: Text search query across name, bio, skills, and interests
+      if (query) {
+        const searchText = [
+          candidate.displayName,
+          candidate.bio,
+          ...candidate.skills,
+          ...candidate.interests
+        ].join(' ').toLowerCase();
+
+        if (!searchText.includes(query)) {
+          continue;
+        }
+      }
+
+      // Filter: Course filter
+      if (courseFilter) {
+        if (normalizeCourseId(candidate.courseId) !== courseFilter) {
+          continue;
+        }
+      }
+
+      // Filter: Skills filter (OR within group, AND across groups)
+      if (skillsFilter.length > 0) {
+        const candSkills = candidate.skills.map(s => s.toLowerCase());
+        const matchesAnySkill = skillsFilter.some(s => candSkills.includes(s));
+        if (!matchesAnySkill) {
+          continue;
+        }
+      }
+
+      // Filter: Interests filter (OR within group, AND across groups)
+      if (interestsFilter.length > 0) {
+        const candInterests = candidate.interests.map(i => i.toLowerCase());
+        const matchesAnyInterest = interestsFilter.some(i => candInterests.includes(i));
+        if (!matchesAnyInterest) {
+          continue;
+        }
+      }
+
+      // Filter: Goals filter (OR within group, AND across groups)
+      if (goalsFilter.length > 0) {
+        const candGoals = candidate.goals.map(g => g.toLowerCase());
+        const matchesAnyGoal = goalsFilter.some(g => candGoals.includes(g));
+        if (!matchesAnyGoal) {
+          continue;
+        }
+      }
+
+      // Compute explainable fit reasons based on saved profile data
+      const fitReasons = calculateFitReasons(candidate, viewer);
+
+      // Add profile card with private account fields excluded
+      matched.push({
+        id: candidate.id,
+        displayName: candidate.displayName,
+        courseId: candidate.courseId,
+        courseName: candidate.courseName,
+        bio: candidate.bio,
+        photoUrl: candidate.photoUrl,
+        skills: candidate.skills,
+        interests: candidate.interests,
+        goals: candidate.goals,
+        fitReasons
+      });
+    }
+
+    // Apply pagination
+    const total = matched.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedProfiles = matched.slice(startIndex, startIndex + limit);
+
+    res.json({
+      profiles: paginatedProfiles,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve community profiles' });
+  }
+});
+
+// -------------------------------------------------------------
+// 12. View Public Profile of Another User (GET /api/profiles/:userId)
 // -------------------------------------------------------------
 app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req, res) => {
   try {
@@ -596,17 +781,22 @@ app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req,
       return res.status(403).json({ error: 'This profile is unavailable' });
     }
 
-    const profile = getUserProfile(req.params.userId);
-    // Explicitly exclude email and private account fields
+    const candidate = getUserProfile(req.params.userId);
+    const viewer = getUserProfile(req.user.id);
+    const fitReasons = calculateFitReasons(candidate, viewer);
+
+    // Explicitly exclude email, password_hash, role, and private account fields
     res.json({
-      id: profile.id,
-      displayName: profile.displayName,
-      courseName: profile.courseName,
-      bio: profile.bio,
-      photoUrl: profile.photoUrl,
-      skills: profile.skills,
-      interests: profile.interests,
-      goals: profile.goals
+      id: candidate.id,
+      displayName: candidate.displayName,
+      courseId: candidate.courseId,
+      courseName: candidate.courseName,
+      bio: candidate.bio,
+      photoUrl: candidate.photoUrl,
+      skills: candidate.skills,
+      interests: candidate.interests,
+      goals: candidate.goals,
+      fitReasons
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to retrieve profile' });

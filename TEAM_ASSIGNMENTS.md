@@ -28,7 +28,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | --- | --- | --- | --- | --- |
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria | Awaiting confirmation | Pending integration |
-| F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Implemented; 40 backend checks passed (F1, F2 & F3), covering all 9 acceptance criteria | Awaiting confirmation | Pending integration |
 | F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
@@ -88,6 +88,21 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Checks: 27 automated tests passing in [backend/test.js](backend/test.js) covering all 7 FR-02 acceptance criteria.
 - Qingling next: independently verify profile fields, persistence across sessions, file errors, and direct unauthorized requests.
 - Malak next: connect frontend `profileService.js` to real backend endpoints.
+
+### F3 - Backend completed on 6 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - Discovery filtering endpoint: `GET /api/profiles` with text search query, course filter, multi-select skills, interests, and goals.
+  - Filter logic: OR within each multi-select group, AND across groups, clear filters returns full community list.
+  - Server-enforced exclusion of viewer (`req.user.id`) and suspended accounts (`status === 'active'`).
+  - Factual explainable fit engine (`calculateFitReasons`): shared interests, shared skills, shared goals, cross-course collaboration, and fallback to `"No shared criteria found yet."`.
+  - Updated `GET /api/profiles/:userId` to include consistent `fitReasons`.
+  - Strict privacy protection: private account fields (`email`, `password_hash`, `role`, `status`) omitted from all responses.
+  - Pagination support: `page`, `limit`, `total`, `totalPages`.
+- Checks: 40 automated tests passing in [backend/test.js](backend/test.js) covering all 9 FR-03 acceptance criteria.
+- Qingling next: independently verify combined filters, fit explanations across course pairs, search results, and privacy rules.
+- Malak next: connect frontend `discoveryService.js` to real backend endpoints.
 
 ### Record for each subsequent completed frontend feature
 

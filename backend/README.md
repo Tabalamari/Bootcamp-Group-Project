@@ -1,8 +1,9 @@
-# Backend: Bootcamp Connect (FR-01 & FR-02)
+# Backend: Bootcamp Connect (FR-01, FR-02 & FR-03)
 
 Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
 - **FR-02:** User profiles, options vocabulary, profile viewing/editing, photo uploads/removal, and community profiles.
+- **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.
 
 **Owner:** Marianna  
 **Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `multer`, `bcryptjs`, Bearer Token (UUID)
@@ -30,9 +31,10 @@ The database `database.sqlite` is created automatically with all tables and seed
 ```bash
 npm test
 ```
-The script runs 27 automated checks verifying:
+The script runs 40 automated checks verifying:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
+- All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
 
 ---
 
@@ -169,7 +171,56 @@ Base URL: `http://localhost:3000/api`
     }
     ```
 
-#### 11. View Public Profile of Another Learner (Protected)
+---
+
+### FR-03: Search and Explainable Fit (Discovery)
+
+#### 11. Search and Filter Profiles (Protected)
+- **`GET /api/profiles`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Query Parameters (optional):**
+    - `query` (string): case-insensitive text search across name, bio, skills, and interests.
+    - `courseId` (string): filter by course (`software-dev` or `business-dev`).
+    - `skills` (string or array): comma-separated skills (OR within skills filter).
+    - `interests` (string or array): comma-separated interests (OR within interests filter).
+    - `goals` (string or array): comma-separated connection goals (OR within goals filter).
+    - `page` (number, default: 1): page number.
+    - `limit` (number, default: 12): items per page.
+  - **Filter Combination:** Different filter groups combine with **AND**; multiple selections within a group combine with **OR**.
+  - **Exclusions:** The current user (`viewer`) and suspended accounts are strictly excluded.
+  - **Success (200 OK):**
+    ```json
+    {
+      "profiles": [
+        {
+          "id": "u-2",
+          "displayName": "Amara Lewis",
+          "courseId": "business-dev",
+          "courseName": "Business Development",
+          "bio": "Turning a sustainable shopping idea into a useful first product.",
+          "photoUrl": "/uploads/u-2-1696512345.png",
+          "skills": ["Market research", "Product strategy"],
+          "interests": ["Sustainability", "Technology"],
+          "goals": ["Project collaboration"],
+          "fitReasons": [
+            "Shared interest: Technology.",
+            "Shared goal: Project collaboration.",
+            "Different courses, with a shared interest in project collaboration."
+          ]
+        }
+      ],
+      "pagination": {
+        "total": 1,
+        "page": 1,
+        "limit": 12,
+        "totalPages": 1
+      }
+    }
+    ```
+  - *When no criteria match, `fitReasons` contains `["No shared criteria found yet."]`.*
+  - *Private fields (`email`, `password_hash`, `role`, `status`) are strictly excluded.*
+
+#### 12. View Public Profile of Another Learner (Protected)
 - **`GET /api/profiles/:userId`**
   - **Header:** `Authorization: Bearer <token>`
   - **Success (200 OK):**
@@ -177,12 +228,16 @@ Base URL: `http://localhost:3000/api`
     {
       "id": "target-user-id",
       "displayName": "Alex Rivers",
+      "courseId": "software-dev",
       "courseName": "Software Development",
       "bio": "...",
       "photoUrl": "/uploads/...",
       "skills": ["React"],
       "interests": ["Technology"],
-      "goals": ["Project collaboration"]
+      "goals": ["Project collaboration"],
+      "fitReasons": [
+        "Skill in common: React."
+      ]
     }
     ```
   - **Security Guarantee:** Private fields (`email`, `password_hash`, `role`, `status`) are strictly excluded from the response. Suspended accounts return `403 Forbidden`.
