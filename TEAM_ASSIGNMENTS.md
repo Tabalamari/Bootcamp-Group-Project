@@ -200,7 +200,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification and merge approval remain open. Current review work is on local `feature/integrate-profiles-discovery`, based on F6. Marianna’s F2/F3 backend is integrated with Malak’s frontend; integration changes have not been pushed.
+F1 local integration checks pass. Independent team verification and merge approval remain open. Current review work is on `feature/integrate-profiles-discovery`, based on F6. Marianna’s F2/F3 backend is integrated with Malak’s frontend on its own branch; application changes are not merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -222,7 +222,7 @@ The feature is complete when all three contributions work together and the share
 - Qingling: independently verify the integrated feature and record outcomes. Her status remains pending.
 - Malak: review the connected UI, then continue F3; F2 integration awaits profile endpoints.
 - Details and startup instructions: [frontend/INTEGRATION.md](frontend/INTEGRATION.md).
-- F2/F3 frontend and backend integration is recorded on local `feature/integrate-profiles-discovery`; see [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Qingling’s independent verification remains pending.
+- F2/F3 frontend and backend integration is published on `feature/integrate-profiles-discovery`; see [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Qingling’s independent verification remains pending.
 
 ## F3 frontend completion - 5 October 2026
 
@@ -231,7 +231,7 @@ The feature is complete when all three contributions work together and the share
 - Marianna: implement authenticated discovery/detail queries, managed options, pagination and server-side privacy/eligibility checks.
 - Qingling: independently verify filtering/fit evidence, then real data and privacy after backend integration.
 - Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
-- F3 is published to origin/feature/frontend-discovery. F2/F3 integration is in progress locally on feature/integrate-profiles-discovery.
+- F3 is published to origin/feature/frontend-discovery. F2/F3 integration is published on feature/integrate-profiles-discovery for review.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
 - Malak next: review the connected F2/F3 flows, then integrate F4-F6 as backend endpoints become available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
@@ -271,8 +271,8 @@ The feature is complete when all three contributions work together and the share
 
 ## F2/F3 local integration - 7 October 2026
 
-- Integrated Marianna’s F2/F3 backend from origin/main with Malak’s profile and discovery screens on local `feature/integrate-profiles-discovery`, based on F6. Not pushed.
+- Integrated Marianna’s F2/F3 backend from origin/main with Malak’s profile and discovery screens on `feature/integrate-profiles-discovery`, based on F6. Published for review; not merged into main.
 - Profiles and managed options load from the API; profile edits persist; photo upload/removal uses protected endpoints. Discovery search, filters, profile details, fit explanations and pagination use protected APIs.
 - Checks: backend suite 40/40; frontend suite 18/18; production build passed. Real browser journey passed profile save, photo upload/removal/persistence, server search/detail/fit/privacy/pagination, and 320/390/1024/1440 px layouts using temporary fictional accounts and an in-memory database.
 - Qingling: independently verify; status remains pending. Marianna: review integration and advise on F6 account/password endpoints. F6 remains a sample preview.
-- Handoff: [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Application changes have not been pushed.
+- Handoff: [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Application changes are on the integration branch; main remains unchanged.

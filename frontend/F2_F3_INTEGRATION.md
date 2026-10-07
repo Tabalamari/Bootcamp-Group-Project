@@ -1,6 +1,6 @@
 # F2 and F3 frontend/backend integration
 
-Local integration branch: `feature/integrate-profiles-discovery`, based on F6. Backend implementation was merged from `origin/main` on 7 October 2026. This integration is local for team review; it has not been pushed or merged.
+Integration branch: `feature/integrate-profiles-discovery`, based on F6. Backend implementation was merged from `origin/main` on 7 October 2026. This branch is published for review; application changes have not been merged into main.
 
 ## F2 profile integration
 

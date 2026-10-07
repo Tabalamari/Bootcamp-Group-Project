@@ -10,6 +10,7 @@ import Admin from './Admin';
 import Settings from './Settings';
 import { messageService } from './messageService';
 import { profileService } from './profileService';
+import { profileApi } from './profileApi';
 
 function App() {
   const [page, setPage] = useState(location.hash === '#settings' ? 'settings' : location.hash === '#admin' ? 'admin' : location.hash === '#messages' ? 'messages' : location.hash === '#discover' ? 'discover' : location.hash === '#profile' ? 'profile' : location.hash === '#login' ? 'login' : 'register');
@@ -39,7 +40,7 @@ function App() {
   const formRef = useRef(null);
   const registering = page === 'register';
   const [profilePhoto, setProfilePhoto] = useState('');
-  useEffect(() => { let active = true; setProfilePhoto(''); if (user) profileService.get(user).then(profile => { if (active) { setProfilePhoto(profile.photo); setUser(u => u ? { ...u, displayName: profile.displayName } : u); } }); return () => { active = false; }; }, [user?.id]);
+  useEffect(() => { let active = true; setProfilePhoto(''); if (user) (isDemo ? profileService.get(user) : profileApi.get()).then(profile => { if (active) { setProfilePhoto(profile.photo); setUser(u => u ? { ...u, displayName: profile.displayName } : u); } }).catch(() => { if (active) setProfilePhoto(''); }); return () => { active = false; }; }, [user?.id]);
 
   async function loadCourses() {
     setCourseError('');
