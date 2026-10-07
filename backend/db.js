@@ -94,6 +94,46 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (goal_id) REFERENCES connection_goals(id) ON DELETE CASCADE
   );
+
+  -- 11. Conversations (1-on-1 private messaging)
+  CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    participant1_id TEXT NOT NULL,
+    participant2_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(participant1_id, participant2_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_conversations_p1 ON conversations(participant1_id);
+  CREATE INDEX IF NOT EXISTS idx_conversations_p2 ON conversations(participant2_id);
+  CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC);
+
+  -- 12. Messages
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at ASC);
+  CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+
+  -- 13. Conversation read tracking
+  CREATE TABLE IF NOT EXISTS conversation_reads (
+    conversation_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (conversation_id, user_id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 // Backfill empty profile rows for any existing users
