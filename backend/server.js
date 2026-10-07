@@ -2,14 +2,129 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Setup uploads directory for profile photos
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(uploadsDir));
+
+// Multer storage and upload configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${req.user.id}-${Date.now()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max limit
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      const err = new Error('INVALID_FILE_TYPE');
+      err.code = 'INVALID_FILE_TYPE';
+      cb(err);
+    }
+  }
+});
+
+// Middleware for photo upload with custom error handling
+function photoUploadMiddleware(req, res, next) {
+  upload.single('photo')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Photo file is too large. Maximum size is 5 MB' });
+      }
+      if (err.code === 'INVALID_FILE_TYPE') {
+        return res.status(415).json({ error: 'Unsupported image format. Allowed formats: JPG, PNG, WebP' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload error' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No photo file provided' });
+    }
+    next();
+  });
+}
+
+// Helper to retrieve full profile for a user
+function getUserProfile(userId) {
+  db.prepare(`
+    INSERT OR IGNORE INTO profiles (user_id, bio, photo_url)
+    VALUES (?, '', NULL)
+  `).run(userId);
+
+  const row = db.prepare(`
+    SELECT
+      users.id,
+      users.display_name,
+      users.course_id,
+      courses.name AS course_name,
+      profiles.bio,
+      profiles.photo_url
+    FROM users
+    JOIN courses ON users.course_id = courses.id
+    LEFT JOIN profiles ON users.id = profiles.user_id
+    WHERE users.id = ?
+  `).get(userId);
+
+  if (!row) return null;
+
+  const skills = db.prepare(`
+    SELECT skills.name
+    FROM profile_skills
+    JOIN skills ON profile_skills.skill_id = skills.id
+    WHERE profile_skills.user_id = ?
+    ORDER BY skills.name ASC
+  `).all(userId).map(r => r.name);
+
+  const interests = db.prepare(`
+    SELECT interests.name
+    FROM profile_interests
+    JOIN interests ON profile_interests.interest_id = interests.id
+    WHERE profile_interests.user_id = ?
+    ORDER BY interests.name ASC
+  `).all(userId).map(r => r.name);
+
+  const goals = db.prepare(`
+    SELECT connection_goals.name
+    FROM profile_goals
+    JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
+    WHERE profile_goals.user_id = ?
+    ORDER BY connection_goals.name ASC
+  `).all(userId).map(r => r.name);
+
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    courseId: row.course_id,
+    courseName: row.course_name,
+    bio: row.bio || '',
+    photoUrl: row.photo_url || null,
+    skills,
+    interests,
+    goals
+  };
+}
 
 // Basic health and info route
 app.get('/api', (req, res) => {
@@ -33,13 +148,13 @@ function authMiddleware(req, res, next) {
   }
 
   const session = db.prepare(`
-    SELECT 
-      users.id, 
-      users.email, 
-      users.display_name, 
-      users.course_id, 
-      users.role, 
-      users.status, 
+    SELECT
+      users.id,
+      users.email,
+      users.display_name,
+      users.course_id,
+      users.role,
+      users.status,
       courses.name AS course_name
     FROM sessions
     JOIN users ON sessions.user_id = users.id
@@ -66,9 +181,9 @@ function authMiddleware(req, res, next) {
 app.get('/api/courses', (req, res) => {
   try {
     const courses = db.prepare(`
-      SELECT id, name 
-      FROM courses 
-      WHERE is_active = 1 
+      SELECT id, name
+      FROM courses
+      WHERE is_active = 1
       ORDER BY name ASC
     `).all();
 
@@ -86,7 +201,7 @@ app.post('/api/auth/register', (req, res) => {
     const { displayName, email, password, courseId } = req.body;
 
     // Check required fields
-    if (![displayName, email, password, courseId].every(value => typeof value === 'string' && value.trim())) {
+    if (!displayName || !email || !password || !courseId) {
       return res.status(400).json({ error: 'All fields (displayName, email, password, courseId) are required' });
     }
 
@@ -130,6 +245,12 @@ app.post('/api/auth/register', (req, res) => {
       VALUES (?, ?, ?, ?, ?, 'learner', 'active')
     `).run(userId, normalizedEmail, passwordHash, trimmedName, courseId);
 
+    // Auto-create empty profile
+    db.prepare(`
+      INSERT OR IGNORE INTO profiles (user_id, bio, photo_url)
+      VALUES (?, '', NULL)
+    `).run(userId);
+
     // Create session (auto-login)
     const token = crypto.randomUUID();
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
@@ -157,21 +278,21 @@ app.post('/api/auth/login', (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (![email, password].every(value => typeof value === 'string' && value.trim())) {
+    if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
 
     const user = db.prepare(`
-      SELECT 
-        users.id, 
-        users.email, 
-        users.password_hash, 
-        users.display_name, 
-        users.course_id, 
-        users.role, 
-        users.status, 
+      SELECT
+        users.id,
+        users.email,
+        users.password_hash,
+        users.display_name,
+        users.course_id,
+        users.role,
+        users.status,
         courses.name AS course_name
       FROM users
       JOIN courses ON users.course_id = courses.id
@@ -233,6 +354,452 @@ app.post('/api/auth/logout', authMiddleware, (req, res) => {
     res.json({ message: 'Successfully logged out' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to log out' });
+  }
+});
+
+// -------------------------------------------------------------
+// 6. Profile Options (GET /api/profile-options)
+// -------------------------------------------------------------
+app.get(['/api/profile-options', '/api/profile/options'], (req, res) => {
+  try {
+    const skills = db.prepare('SELECT name FROM skills WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
+    const interests = db.prepare('SELECT name FROM interests WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
+    const goals = db.prepare('SELECT name FROM connection_goals WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
+
+    res.json({
+      skills,
+      interests,
+      goals
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve profile options' });
+  }
+});
+
+// -------------------------------------------------------------
+// 7. Get Current User Profile (GET /api/profiles/me)
+// -------------------------------------------------------------
+app.get(['/api/profiles/me', '/api/profile/me'], authMiddleware, (req, res) => {
+  try {
+    const profile = getUserProfile(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve profile' });
+  }
+});
+
+// -------------------------------------------------------------
+// 8. Update Current User Profile (PATCH / PUT /api/profiles/me)
+// -------------------------------------------------------------
+function handleUpdateProfile(req, res) {
+  try {
+    const { displayName, bio, skills, interests, goals } = req.body;
+
+    // Validate displayName if supplied
+    if (displayName !== undefined) {
+      if (typeof displayName !== 'string') {
+        return res.status(400).json({ error: 'Display name must be a string' });
+      }
+      const trimmed = displayName.trim();
+      if (trimmed.length < 2 || trimmed.length > 80) {
+        return res.status(400).json({ error: 'Display name must be between 2 and 80 characters long' });
+      }
+    }
+
+    // Validate bio if supplied
+    if (bio !== undefined) {
+      if (typeof bio !== 'string') {
+        return res.status(400).json({ error: 'Bio must be a string' });
+      }
+      if (bio.length > 500) {
+        return res.status(400).json({ error: 'Bio cannot exceed 500 characters' });
+      }
+    }
+
+    // Validate skills if supplied
+    const validSkillIds = [];
+    if (skills !== undefined) {
+      if (!Array.isArray(skills)) {
+        return res.status(400).json({ error: 'Skills must be an array' });
+      }
+      for (const item of skills) {
+        const found = db.prepare('SELECT id FROM skills WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (!found) {
+          return res.status(400).json({ error: `Invalid skill selection: ${item}` });
+        }
+        validSkillIds.push(found.id);
+      }
+    }
+
+    // Validate interests if supplied
+    const validInterestIds = [];
+    if (interests !== undefined) {
+      if (!Array.isArray(interests)) {
+        return res.status(400).json({ error: 'Interests must be an array' });
+      }
+      for (const item of interests) {
+        const found = db.prepare('SELECT id FROM interests WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (!found) {
+          return res.status(400).json({ error: `Invalid interest selection: ${item}` });
+        }
+        validInterestIds.push(found.id);
+      }
+    }
+
+    // Validate goals if supplied
+    const validGoalIds = [];
+    if (goals !== undefined) {
+      if (!Array.isArray(goals)) {
+        return res.status(400).json({ error: 'Goals must be an array' });
+      }
+      for (const item of goals) {
+        const found = db.prepare('SELECT id FROM connection_goals WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (!found) {
+          return res.status(400).json({ error: `Invalid connection goal selection: ${item}` });
+        }
+        validGoalIds.push(found.id);
+      }
+    }
+
+    // Atomic transaction for updates
+    const updateTx = db.transaction(() => {
+      if (displayName !== undefined) {
+        db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(displayName.trim(), req.user.id);
+      }
+
+      db.prepare(`
+        INSERT INTO profiles (user_id, bio, photo_url)
+        VALUES (?, '', NULL)
+        ON CONFLICT(user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+      `).run(req.user.id);
+
+      if (bio !== undefined) {
+        db.prepare('UPDATE profiles SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?').run(bio.trim(), req.user.id);
+      }
+
+      if (skills !== undefined) {
+        db.prepare('DELETE FROM profile_skills WHERE user_id = ?').run(req.user.id);
+        const insertSkill = db.prepare('INSERT OR IGNORE INTO profile_skills (user_id, skill_id) VALUES (?, ?)');
+        for (const sId of validSkillIds) {
+          insertSkill.run(req.user.id, sId);
+        }
+      }
+
+      if (interests !== undefined) {
+        db.prepare('DELETE FROM profile_interests WHERE user_id = ?').run(req.user.id);
+        const insertInterest = db.prepare('INSERT OR IGNORE INTO profile_interests (user_id, interest_id) VALUES (?, ?)');
+        for (const iId of validInterestIds) {
+          insertInterest.run(req.user.id, iId);
+        }
+      }
+
+      if (goals !== undefined) {
+        db.prepare('DELETE FROM profile_goals WHERE user_id = ?').run(req.user.id);
+        const insertGoal = db.prepare('INSERT OR IGNORE INTO profile_goals (user_id, goal_id) VALUES (?, ?)');
+        for (const gId of validGoalIds) {
+          insertGoal.run(req.user.id, gId);
+        }
+      }
+    });
+
+    updateTx();
+
+    const profile = getUserProfile(req.user.id);
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+}
+
+app.patch(['/api/profiles/me', '/api/profile/me'], authMiddleware, handleUpdateProfile);
+app.put(['/api/profiles/me', '/api/profile/me'], authMiddleware, handleUpdateProfile);
+
+// -------------------------------------------------------------
+// 9. Upload Profile Photo (POST /api/profiles/me/photo)
+// -------------------------------------------------------------
+app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, photoUploadMiddleware, (req, res) => {
+  try {
+    // Delete previous file if exists
+    const prevProfile = db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
+    if (prevProfile && prevProfile.photo_url && prevProfile.photo_url.startsWith('/uploads/')) {
+      const prevFilename = path.basename(prevProfile.photo_url);
+      const prevPath = path.join(uploadsDir, prevFilename);
+      if (fs.existsSync(prevPath)) {
+        try {
+          fs.unlinkSync(prevPath);
+        } catch (e) {}
+      }
+    }
+
+    const photoUrl = `/uploads/${req.file.filename}`;
+
+    db.prepare(`
+      INSERT INTO profiles (user_id, bio, photo_url)
+      VALUES (?, '', ?)
+      ON CONFLICT(user_id) DO UPDATE SET photo_url = excluded.photo_url, updated_at = CURRENT_TIMESTAMP
+    `).run(req.user.id, photoUrl);
+
+    res.json({
+      photoUrl,
+      message: 'Photo uploaded successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
+});
+
+// -------------------------------------------------------------
+// 10. Delete Profile Photo (DELETE /api/profiles/me/photo)
+// -------------------------------------------------------------
+app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, (req, res) => {
+  try {
+    const profile = db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
+    if (profile && profile.photo_url && profile.photo_url.startsWith('/uploads/')) {
+      const filename = path.basename(profile.photo_url);
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (e) {}
+      }
+    }
+
+    db.prepare(`
+      UPDATE profiles
+      SET photo_url = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+    `).run(req.user.id);
+
+    res.json({
+      photoUrl: null,
+      message: 'Photo removed successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to remove photo' });
+  }
+});
+
+// -------------------------------------------------------------
+// 11. Discovery: Search and Explainable Fit (GET /api/profiles)
+// -------------------------------------------------------------
+
+// Helper to normalize course IDs
+function normalizeCourseId(courseId) {
+  if (!courseId) return '';
+  const map = {
+    'software-development': 'software-dev',
+    'business-development': 'business-dev'
+  };
+  return map[courseId.toLowerCase()] || courseId.toLowerCase();
+}
+
+// Helper to parse query parameters that may be an array or comma-separated string
+function parseListParam(param) {
+  if (!param) return [];
+  if (Array.isArray(param)) {
+    return param.map(s => String(s).trim()).filter(Boolean);
+  }
+  return String(param).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// Calculate evidence-based fit reasons between candidate and viewer
+function calculateFitReasons(candidate, viewer) {
+  const reasons = [];
+
+  // 1. Shared interests
+  const viewerInterests = (viewer.interests || []).map(s => s.toLowerCase());
+  const sharedInterests = (candidate.interests || []).filter(item => viewerInterests.includes(item.toLowerCase()));
+  if (sharedInterests.length > 0) {
+    reasons.push(`Shared interest: ${sharedInterests.join(', ')}.`);
+  }
+
+  // 2. Shared skills
+  const viewerSkills = (viewer.skills || []).map(s => s.toLowerCase());
+  const sharedSkills = (candidate.skills || []).filter(item => viewerSkills.includes(item.toLowerCase()));
+  if (sharedSkills.length > 0) {
+    reasons.push(`Skill in common: ${sharedSkills.join(', ')}.`);
+  }
+
+  // 3. Shared connection goals
+  const viewerGoals = (viewer.goals || []).map(s => s.toLowerCase());
+  const sharedGoals = (candidate.goals || []).filter(item => viewerGoals.includes(item.toLowerCase()));
+  if (sharedGoals.length > 0) {
+    reasons.push(`Shared goal: ${sharedGoals.join(', ')}.`);
+  }
+
+  // 4. Complementary courses (different courses with shared interest in project collaboration)
+  const normCandCourse = normalizeCourseId(candidate.courseId);
+  const normViewerCourse = normalizeCourseId(viewer.courseId);
+  const candHasProjectCollab = (candidate.goals || []).some(g => g.toLowerCase() === 'project collaboration');
+  const viewerHasProjectCollab = (viewer.goals || []).some(g => g.toLowerCase() === 'project collaboration');
+
+  if (normCandCourse && normViewerCourse && normCandCourse !== normViewerCourse && candHasProjectCollab && viewerHasProjectCollab) {
+    reasons.push('Different courses, with a shared interest in project collaboration.');
+  }
+
+  // 5. Fallback when no criteria match
+  if (reasons.length === 0) {
+    reasons.push('No shared criteria found yet.');
+  }
+
+  return reasons;
+}
+
+// Search and filter community profiles (Discovery)
+app.get('/api/profiles', authMiddleware, (req, res) => {
+  try {
+    const viewer = getUserProfile(req.user.id);
+    if (!viewer) {
+      return res.status(401).json({ error: 'Viewer profile not found' });
+    }
+
+    // Parse filtering parameters
+    const query = (req.query.query || '').trim().toLowerCase();
+    const courseFilter = normalizeCourseId(req.query.courseId);
+    const skillsFilter = parseListParam(req.query.skills).map(s => s.toLowerCase());
+    const interestsFilter = parseListParam(req.query.interests).map(s => s.toLowerCase());
+    const goalsFilter = parseListParam(req.query.goals).map(s => s.toLowerCase());
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 12);
+
+    // Fetch active candidates, strictly excluding current user and suspended accounts
+    const candidateRows = db.prepare(`
+      SELECT users.id
+      FROM users
+      WHERE users.status = 'active' AND users.id != ?
+      ORDER BY users.display_name ASC
+    `).all(req.user.id);
+
+    // Hydrate candidates and apply filters
+    const matched = [];
+    for (const row of candidateRows) {
+      const candidate = getUserProfile(row.id);
+      if (!candidate) continue;
+
+      // Filter: Text search query across name, bio, skills, and interests
+      if (query) {
+        const searchText = [
+          candidate.displayName,
+          candidate.bio,
+          ...candidate.skills,
+          ...candidate.interests
+        ].join(' ').toLowerCase();
+
+        if (!searchText.includes(query)) {
+          continue;
+        }
+      }
+
+      // Filter: Course filter
+      if (courseFilter) {
+        if (normalizeCourseId(candidate.courseId) !== courseFilter) {
+          continue;
+        }
+      }
+
+      // Filter: Skills filter (OR within group, AND across groups)
+      if (skillsFilter.length > 0) {
+        const candSkills = candidate.skills.map(s => s.toLowerCase());
+        const matchesAnySkill = skillsFilter.some(s => candSkills.includes(s));
+        if (!matchesAnySkill) {
+          continue;
+        }
+      }
+
+      // Filter: Interests filter (OR within group, AND across groups)
+      if (interestsFilter.length > 0) {
+        const candInterests = candidate.interests.map(i => i.toLowerCase());
+        const matchesAnyInterest = interestsFilter.some(i => candInterests.includes(i));
+        if (!matchesAnyInterest) {
+          continue;
+        }
+      }
+
+      // Filter: Goals filter (OR within group, AND across groups)
+      if (goalsFilter.length > 0) {
+        const candGoals = candidate.goals.map(g => g.toLowerCase());
+        const matchesAnyGoal = goalsFilter.some(g => candGoals.includes(g));
+        if (!matchesAnyGoal) {
+          continue;
+        }
+      }
+
+      // Compute explainable fit reasons based on saved profile data
+      const fitReasons = calculateFitReasons(candidate, viewer);
+
+      // Add profile card with private account fields excluded
+      matched.push({
+        id: candidate.id,
+        displayName: candidate.displayName,
+        courseId: candidate.courseId,
+        courseName: candidate.courseName,
+        bio: candidate.bio,
+        photoUrl: candidate.photoUrl,
+        skills: candidate.skills,
+        interests: candidate.interests,
+        goals: candidate.goals,
+        fitReasons
+      });
+    }
+
+    // Apply pagination
+    const total = matched.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedProfiles = matched.slice(startIndex, startIndex + limit);
+
+    res.json({
+      profiles: paginatedProfiles,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve community profiles' });
+  }
+});
+
+// -------------------------------------------------------------
+// 12. View Public Profile of Another User (GET /api/profiles/:userId)
+// -------------------------------------------------------------
+app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req, res) => {
+  try {
+    const targetUser = db.prepare('SELECT id, status FROM users WHERE id = ?').get(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+
+    if (targetUser.status === 'suspended') {
+      return res.status(403).json({ error: 'This profile is unavailable' });
+    }
+
+    const candidate = getUserProfile(req.params.userId);
+    const viewer = getUserProfile(req.user.id);
+    const fitReasons = calculateFitReasons(candidate, viewer);
+
+    // Explicitly exclude email, password_hash, role, and private account fields
+    res.json({
+      id: candidate.id,
+      displayName: candidate.displayName,
+      courseId: candidate.courseId,
+      courseName: candidate.courseName,
+      bio: candidate.bio,
+      photoUrl: candidate.photoUrl,
+      skills: candidate.skills,
+      interests: candidate.interests,
+      goals: candidate.goals,
+      fitReasons
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve profile' });
   }
 });
 

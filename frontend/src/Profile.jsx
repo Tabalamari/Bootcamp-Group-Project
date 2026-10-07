@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { profileOptions, profileService, validatePhoto, validateProfile } from './profileService';
+import { profileApi } from './profileApi';
+import { isDemo } from './authService';
+
+const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || `${window.location.protocol}//${window.location.hostname}:3000`;
 
 export function Avatar({ photo, name, large = false }) {
   return <span className={`profile-avatar ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>}</span>;
@@ -16,19 +20,31 @@ export default function Profile({ user, courses, onSaved }) {
   const [failure, setFailure] = useState('');
   const [notice, setNotice] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [availableOptions, setAvailableOptions] = useState(profileOptions);
   const dialog = useRef(null), fileInput = useRef(null), form = useRef(null), photoVersion = useRef(0);
-  useEffect(() => { let alive = true; profileService.get(user).then(value => { if (alive) { setSaved(value); setDraft(value); } }).catch(error => { if (alive) setFailure(error.message); }); return () => { alive = false; photoVersion.current++; }; }, [user.id]);
+  useEffect(() => { let alive = true; Promise.all([isDemo ? profileService.get(user) : profileApi.get(), isDemo ? Promise.resolve(profileOptions) : profileApi.options()]).then(([value, options]) => { if (alive) { setSaved(value); setDraft(value); setAvailableOptions(options); } }).catch(error => { if (alive) setFailure(error.message); }); return () => { alive = false; photoVersion.current++; }; }, [user.id]);
   const profile = editing ? draft : saved;
   async function save(event) {
     event.preventDefault();
-    const problems = validateProfile(draft);
+    const problems = isDemo ? validateProfile(draft) : {
+      ...(!draft.displayName.trim() || draft.displayName.trim().length < 2 || draft.displayName.trim().length > 80 ? { displayName: 'Enter a name between 2 and 80 characters.' } : {}),
+      ...(draft.bio.length > 500 ? { bio: 'Keep your bio to 500 characters.' } : {}),
+      ...Object.fromEntries(['skills', 'interests', 'goals'].filter(key => !Array.isArray(draft[key]) || draft[key].some(value => !availableOptions[key].includes(value))).map(key => [key, 'Choose from the current community options.'])),
+    };
     setErrors(problems); setFailure(''); setNotice('');
     if (Object.keys(problems).length) { form.current.querySelector('[name="displayName"]')?.focus(); return; }
     setBusy(true);
     try {
-      const result = await profileService.save(user, draft);
+      const result = isDemo ? await profileService.save(user, draft) : await profileApi.save(user, draft);
+      if (!isDemo && draft.photo !== saved.photo) {
+        if (draft.photo) {
+          const blob = await (await fetch(draft.photo)).blob();
+          const uploaded = await profileApi.upload(new File([blob], 'profile-photo', { type: blob.type }));
+          result.photo = uploaded.photoUrl ? new URL(uploaded.photoUrl, assetOrigin).href : '';
+        } else { await profileApi.removePhoto(); result.photo = ''; }
+      }
       setSaved(result); setDraft(result); setEditing(false); setPhotoError('');
-      onSaved(result); setNotice('Profile saved in this demo.');
+      onSaved(result); setNotice(isDemo ? 'Profile saved in this demo.' : 'Your profile has been saved.');
     } catch (error) { setFailure(error.message); }
     finally { setBusy(false); }
   }
@@ -53,9 +69,9 @@ export default function Profile({ user, courses, onSaved }) {
   function cancel() { photoVersion.current++; setReadingPhoto(false); setDraft(saved); setEditing(false); setErrors({}); setPhotoError(''); setFailure(''); }
   function toggle(key, value) { setDraft(p => ({ ...p, [key]: p[key].includes(value) ? p[key].filter(item => item !== value) : [...p[key], value] })); }
   function selections(key, title) {
-    return <fieldset className="profile-options"><legend>{title}</legend><div className="option-grid">{profileOptions[key].map(value => <label key={value} className="option"><input type="checkbox" checked={draft[key].includes(value)} onChange={() => toggle(key, value)} /><span>{value}</span></label>)}</div></fieldset>;
+    return <fieldset className="profile-options"><legend>{title}</legend><div className="option-grid">{availableOptions[key].map(value => <label key={value} className="option"><input type="checkbox" checked={draft[key].includes(value)} onChange={() => toggle(key, value)} /><span>{value}</span></label>)}</div></fieldset>;
   }
-  if (!profile) return <section className="form-card"><h1>Your profile</h1><p role={failure ? 'alert' : 'status'}>{failure || 'Loading your profile…'}</p>{failure && <button className="secondary" onClick={() => { setFailure(''); profileService.get(user).then(p => { setSaved(p); setDraft(p); }).catch(e => setFailure(e.message)); }}>Try again</button>}</section>;
+  if (!profile) return <section className="form-card"><h1>Your profile</h1><p role={failure ? 'alert' : 'status'}>{failure || 'Loading your profile…'}</p>{failure && <button className="secondary" onClick={() => { setFailure(''); (isDemo ? profileService.get(user) : profileApi.get()).then(p => { setSaved(p); setDraft(p); }).catch(e => setFailure(e.message)); }}>Try again</button>}</section>;
   return <section className="profile-page">
     <a href="#welcome" className="back-link">← Back to welcome</a>
     <div className="profile-title"><div><span className="eyebrow">LET PEOPLE GET TO KNOW YOU</span><h1>{editing ? 'Edit your profile' : 'Your profile'}</h1><p className="intro">Show what you bring and what you want to build together.</p></div>{!editing && <button className="primary" onClick={() => { setDraft(saved); setNotice(''); setEditing(true); }}>Edit profile</button>}</div>
