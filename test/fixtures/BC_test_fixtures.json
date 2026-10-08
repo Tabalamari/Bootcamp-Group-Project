@@ -1,0 +1,941 @@
+{
+  "_meta": {
+    "description": "Fictional test fixtures for Bootcamp Connect (verification). All people, emails and passwords are invented; passwords are for test use only.",
+    "assumptions": [
+      "Skill, interest, goal and active/inactive values are placeholders; replace with backend seed vocabulary (GET /api/profile-options).",
+      "Course IDs software-dev and business-dev come from TEAM_ASSIGNMENTS.md.",
+      "Display name 2-80 characters and bio max 500 characters per the F2 backend summary.",
+      "Admin account (U24) must be created with role 'admin' in the real database."
+    ]
+  },
+  "profiles": [
+    {
+      "id": "U01",
+      "displayName": "Aiko Tanaka",
+      "email": "aiko.tanaka@example.com",
+      "password": "TestPass-01!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Backend-leaning developer who likes turning messy data into clean APIs. Looking for a business partner for an education product.",
+      "skills": [
+        "Python",
+        "SQL",
+        "APIs"
+      ],
+      "interests": [
+        "Edtech",
+        "AI"
+      ],
+      "goals": [
+        "Find a co-founder",
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Typical software profile; shares interest AND goal with U11 (cross-course fit)"
+    },
+    {
+      "id": "U02",
+      "displayName": "Ben Okafor",
+      "email": "ben.okafor@example.com",
+      "password": "TestPass-02!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Frontend developer, happiest when a UI feels effortless.",
+      "skills": [
+        "JavaScript",
+        "React",
+        "UX design"
+      ],
+      "interests": [
+        "Gaming",
+        "Social impact"
+      ],
+      "goals": [
+        "Collaborate on a project",
+        "Make friends"
+      ],
+      "testPurpose": "Shares skills with U03 (same-course fit)"
+    },
+    {
+      "id": "U03",
+      "displayName": "Chloe Martin",
+      "email": "chloe.martin@example.com",
+      "password": "TestPass-03!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Full-stack beginner building a portfolio of small apps.",
+      "skills": [
+        "JavaScript",
+        "Node.js",
+        "SQL"
+      ],
+      "interests": [
+        "Fintech",
+        "Gaming"
+      ],
+      "goals": [
+        "Find a mentor",
+        "Make friends"
+      ],
+      "testPurpose": "Shares interest with U02 and skill with U02/U01"
+    },
+    {
+      "id": "U04",
+      "displayName": "Dev Patel",
+      "email": "dev.patel@example.com",
+      "password": "TestPass-04!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Interested in sustainability tech and data dashboards.",
+      "skills": [
+        "Python",
+        "Data visualisation"
+      ],
+      "interests": [
+        "Sustainability",
+        "Healthtech"
+      ],
+      "goals": [
+        "Find a co-founder"
+      ],
+      "testPurpose": "Shares goal with U01; cross-course shared interest with U12"
+    },
+    {
+      "id": "U05",
+      "displayName": "Elena Rossi",
+      "email": "elena.rossi@example.com",
+      "password": "TestPass-05!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Security-minded developer who enjoys code review.",
+      "skills": [
+        "Node.js",
+        "APIs",
+        "Security"
+      ],
+      "interests": [
+        "Fintech"
+      ],
+      "goals": [
+        "Find a mentor",
+        "Practice pitching"
+      ],
+      "testPurpose": "Single-interest profile"
+    },
+    {
+      "id": "U06",
+      "displayName": "Farid Haddad",
+      "email": "farid.haddad@example.com",
+      "password": "TestPass-06!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Mobile developer exploring health apps.",
+      "skills": [
+        "React",
+        "JavaScript"
+      ],
+      "interests": [
+        "Healthtech",
+        "AI"
+      ],
+      "goals": [
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Shares interest with U04 and U13"
+    },
+    {
+      "id": "U07",
+      "displayName": "Grace Liu",
+      "email": "grace.liu@example.com",
+      "password": "TestPass-07!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Machine learning hobbyist seeking product-minded teammates.",
+      "skills": [
+        "Python",
+        "Machine learning"
+      ],
+      "interests": [
+        "AI",
+        "Edtech"
+      ],
+      "goals": [
+        "Find a co-founder",
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Strong cross-course fit with U11 and U14"
+    },
+    {
+      "id": "U08",
+      "displayName": "Hamza Yilmaz",
+      "email": "hamza.yilmaz@example.com",
+      "password": "TestPass-08!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "DevOps-curious developer who enjoys automation.",
+      "skills": [
+        "Python",
+        "DevOps"
+      ],
+      "interests": [
+        "Gaming"
+      ],
+      "goals": [
+        "Make friends"
+      ],
+      "testPurpose": "Gaming-only interest"
+    },
+    {
+      "id": "U09",
+      "displayName": "Isla Brown",
+      "email": "isla.brown@example.com",
+      "password": "TestPass-09!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Database enthusiast who likes clear schemas.",
+      "skills": [
+        "SQL",
+        "Data visualisation"
+      ],
+      "interests": [
+        "Social impact"
+      ],
+      "goals": [
+        "Find a mentor"
+      ],
+      "testPurpose": "Combined-filter test: SQL AND Social impact"
+    },
+    {
+      "id": "U10",
+      "displayName": "Jonas Weber",
+      "email": "jonas.weber@example.com",
+      "password": "TestPass-10!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Embedded systems tinkerer.",
+      "skills": [
+        "Embedded systems"
+      ],
+      "interests": [
+        "Robotics"
+      ],
+      "goals": [
+        "Practice pitching"
+      ],
+      "testPurpose": "Shares NO criteria with any other profile: expect 'No shared criteria found yet.'"
+    },
+    {
+      "id": "U11",
+      "displayName": "Kofi Mensah",
+      "email": "kofi.mensah@example.com",
+      "password": "TestPass-11!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Business developer with a sales background, keen to build edtech with a technical partner.",
+      "skills": [
+        "Sales",
+        "Product strategy"
+      ],
+      "interests": [
+        "Edtech",
+        "Social impact"
+      ],
+      "goals": [
+        "Find a co-founder",
+        "Make friends"
+      ],
+      "testPurpose": "Cross-course fit with U01, U07"
+    },
+    {
+      "id": "U12",
+      "displayName": "Lena Fischer",
+      "email": "lena.fischer@example.com",
+      "password": "TestPass-12!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Sustainability consultant moving into startups.",
+      "skills": [
+        "Market research",
+        "Finance"
+      ],
+      "interests": [
+        "Sustainability"
+      ],
+      "goals": [
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Cross-course shared interest with U04"
+    },
+    {
+      "id": "U13",
+      "displayName": "Mateo Garcia",
+      "email": "mateo.garcia@example.com",
+      "password": "TestPass-13!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Healthcare operations background, interested in health technology.",
+      "skills": [
+        "Operations",
+        "Project management"
+      ],
+      "interests": [
+        "Healthtech"
+      ],
+      "goals": [
+        "Find a co-founder",
+        "Find a mentor"
+      ],
+      "testPurpose": "Cross-course shared interest with U06"
+    },
+    {
+      "id": "U14",
+      "displayName": "Nadia Rahman",
+      "email": "nadia.rahman@example.com",
+      "password": "TestPass-14!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Marketing generalist who loves storytelling and pitching.",
+      "skills": [
+        "Marketing",
+        "Branding"
+      ],
+      "interests": [
+        "AI",
+        "Social impact"
+      ],
+      "goals": [
+        "Practice pitching",
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Shares interest with U07"
+    },
+    {
+      "id": "U15",
+      "displayName": "Oscar Lindgren",
+      "email": "oscar.lindgren@example.com",
+      "password": "TestPass-15!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Finance graduate exploring fintech start-ups.",
+      "skills": [
+        "Finance",
+        "Market research"
+      ],
+      "interests": [
+        "Fintech"
+      ],
+      "goals": [
+        "Find a co-founder"
+      ],
+      "testPurpose": "Cross-course shared interest with U03, U05"
+    },
+    {
+      "id": "U16",
+      "displayName": "Priya Nair",
+      "email": "priya.nair@example.com",
+      "password": "TestPass-16!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Product manager in training, loves user interviews.",
+      "skills": [
+        "Product strategy",
+        "Market research"
+      ],
+      "interests": [
+        "Edtech",
+        "Gaming"
+      ],
+      "goals": [
+        "Find a mentor",
+        "Make friends"
+      ],
+      "testPurpose": "Combined-filter test: Edtech AND Find a mentor"
+    },
+    {
+      "id": "U17",
+      "displayName": "Quentin Dubois",
+      "email": "quentin.dubois@example.com",
+      "password": "TestPass-17!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Operations specialist who enjoys building processes.",
+      "skills": [
+        "Operations",
+        "Sales"
+      ],
+      "interests": [
+        "Social impact"
+      ],
+      "goals": [
+        "Make friends"
+      ],
+      "testPurpose": "Same-course fit with U11"
+    },
+    {
+      "id": "U18",
+      "displayName": "Rosa Alvarez",
+      "email": "rosa.alvarez@example.com",
+      "password": "TestPass-18!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Brand strategist interested in games and creative tech.",
+      "skills": [
+        "Branding",
+        "Marketing"
+      ],
+      "interests": [
+        "Gaming"
+      ],
+      "goals": [
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Shares interest with U02, U08, U16"
+    },
+    {
+      "id": "U19",
+      "displayName": "Sam Okoro",
+      "email": "sam.okoro@example.com",
+      "password": "TestPass-19!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "",
+      "skills": [],
+      "interests": [],
+      "goals": [],
+      "testPurpose": "EMPTY PROFILE: no bio, skills, interests or goals; check empty states"
+    },
+    {
+      "id": "U20",
+      "displayName": "Maximilian Alexander Bartholomew Christopherson-Montgomery Fitzgerald-Wellington",
+      "email": "long.name@example.com",
+      "password": "TestPass-20!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Name length boundary test (80 characters).",
+      "skills": [
+        "Sales"
+      ],
+      "interests": [
+        "Edtech"
+      ],
+      "goals": [
+        "Make friends"
+      ],
+      "testPurpose": "Display name at 80-character maximum"
+    },
+    {
+      "id": "U21",
+      "displayName": "Tara Quinn",
+      "email": "tara.quinn@example.com",
+      "password": "TestPass-21!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly 500 characters. Test bio padded to exactly ",
+      "skills": [
+        "Python"
+      ],
+      "interests": [
+        "AI"
+      ],
+      "goals": [
+        "Collaborate on a project"
+      ],
+      "testPurpose": "Bio at exactly 500 characters (maximum)"
+    },
+    {
+      "id": "U22",
+      "displayName": "Uma Shah",
+      "email": "uma.shah@example.com",
+      "password": "TestPass-22!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "suspended",
+      "bio": "Suspended account, should never appear in discovery.",
+      "skills": [
+        "Marketing",
+        "Sales"
+      ],
+      "interests": [
+        "Edtech",
+        "AI"
+      ],
+      "goals": [
+        "Find a co-founder"
+      ],
+      "testPurpose": "SUSPENDED: excluded from discovery, profile view blocked, login refused or revoked"
+    },
+    {
+      "id": "U23",
+      "displayName": "Victor Novak",
+      "email": "victor.novak@example.com",
+      "password": "TestPass-23!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "suspended",
+      "bio": "Suspended account, should never appear in discovery.",
+      "skills": [
+        "Python",
+        "SQL"
+      ],
+      "interests": [
+        "Edtech",
+        "AI"
+      ],
+      "goals": [
+        "Find a co-founder"
+      ],
+      "testPurpose": "SUSPENDED: would otherwise match U01/U07, so exclusion is visible"
+    },
+    {
+      "id": "U24",
+      "displayName": "Wendy Admin",
+      "email": "wendy.admin@example.com",
+      "password": "AdminPass-01!",
+      "courseId": "software-dev",
+      "role": "admin",
+      "status": "active",
+      "bio": "Test administrator account.",
+      "skills": [],
+      "interests": [],
+      "goals": [],
+      "testPurpose": "ADMIN: access to admin APIs; learners must be denied (403) on the same endpoints"
+    },
+    {
+      "id": "U25",
+      "displayName": "Yusuf Demir",
+      "email": "yusuf.demir@example.com",
+      "password": "TestPass-25!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "Bio only: no skills, interests or goals selected yet.",
+      "skills": [],
+      "interests": [],
+      "goals": [],
+      "testPurpose": "SPARSE: bio filled, all option lists empty"
+    },
+    {
+      "id": "U26",
+      "displayName": "Zoe Campbell",
+      "email": "zoe.campbell@example.com",
+      "password": "TestPass-26!",
+      "courseId": "business-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "",
+      "skills": [
+        "Sales",
+        "jQuery"
+      ],
+      "interests": [],
+      "goals": [],
+      "testPurpose": "SPARSE: skills only, no bio. Includes INACTIVE skill (jQuery) that must still display"
+    },
+    {
+      "id": "U27",
+      "displayName": "Arjun Mehta",
+      "email": "arjun.mehta@example.com",
+      "password": "TestPass-27!",
+      "courseId": "software-dev",
+      "role": "learner",
+      "status": "active",
+      "bio": "",
+      "skills": [],
+      "interests": [
+        "Edtech",
+        "Blockchain"
+      ],
+      "goals": [
+        "Find a mentor"
+      ],
+      "testPurpose": "SPARSE: interests and goals only, no bio. Includes INACTIVE interest (Blockchain) that must still display"
+    }
+  ],
+  "vocabulary": {
+    "courses": [
+      {
+        "value": "software-dev",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "business-dev",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "data-science",
+        "status": "inactive",
+        "expectedBehaviour": "Deactivated course: registration must be rejected (R11)"
+      }
+    ],
+    "skills": [
+      {
+        "value": "Python",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "JavaScript",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "React",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "SQL",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Node.js",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "APIs",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "UX design",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Data visualisation",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Security",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Machine learning",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "DevOps",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Embedded systems",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Sales",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Product strategy",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Market research",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Finance",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Operations",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Project management",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Marketing",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Branding",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "jQuery",
+        "status": "inactive",
+        "expectedBehaviour": "Deactivated: U26 still references it; must remain visible and not be offered for new selection"
+      }
+    ],
+    "interests": [
+      {
+        "value": "Edtech",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "AI",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Healthtech",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Fintech",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Sustainability",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Gaming",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Social impact",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Robotics",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Blockchain",
+        "status": "inactive",
+        "expectedBehaviour": "Deactivated: U27 still references it; must remain visible and not be offered for new selection"
+      }
+    ],
+    "goals": [
+      {
+        "value": "Find a co-founder",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Collaborate on a project",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Make friends",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Find a mentor",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Practice pitching",
+        "status": "active",
+        "expectedBehaviour": ""
+      },
+      {
+        "value": "Find a study group",
+        "status": "inactive",
+        "expectedBehaviour": "Deactivated and unused: must not appear in profile options"
+      }
+    ]
+  },
+  "invalidRegistrations": [
+    {
+      "id": "R01",
+      "scenario": "Missing display name",
+      "displayName": "",
+      "email": "r01@example.com",
+      "password": "TestPass-R01!",
+      "courseId": "software-dev",
+      "expected": "Rejected; no account created"
+    },
+    {
+      "id": "R02",
+      "scenario": "Display name too short (1 char)",
+      "displayName": "A",
+      "email": "r02@example.com",
+      "password": "TestPass-R02!",
+      "courseId": "software-dev",
+      "expected": "Rejected (name must be 2-80 characters)"
+    },
+    {
+      "id": "R03",
+      "scenario": "Display name too long (81 chars)",
+      "displayName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "email": "r03@example.com",
+      "password": "TestPass-R03!",
+      "courseId": "software-dev",
+      "expected": "Rejected (name must be 2-80 characters)"
+    },
+    {
+      "id": "R04",
+      "scenario": "Missing email",
+      "displayName": "Test Missing Email",
+      "email": "",
+      "password": "TestPass-R04!",
+      "courseId": "software-dev",
+      "expected": "Rejected"
+    },
+    {
+      "id": "R05",
+      "scenario": "Invalid email format",
+      "displayName": "Test Bad Email",
+      "email": "not-an-email",
+      "password": "TestPass-R05!",
+      "courseId": "software-dev",
+      "expected": "Rejected"
+    },
+    {
+      "id": "R06",
+      "scenario": "Duplicate email (same case)",
+      "displayName": "Duplicate One",
+      "email": "aiko.tanaka@example.com",
+      "password": "TestPass-R06!",
+      "courseId": "software-dev",
+      "expected": "Rejected; still only one U01 account"
+    },
+    {
+      "id": "R07",
+      "scenario": "Duplicate email (different case)",
+      "displayName": "Duplicate Two",
+      "email": "AIKO.TANAKA@EXAMPLE.COM",
+      "password": "TestPass-R07!",
+      "courseId": "software-dev",
+      "expected": "Check outcome; emails should normally be case-insensitive"
+    },
+    {
+      "id": "R08",
+      "scenario": "Missing password",
+      "displayName": "Test No Password",
+      "email": "r08@example.com",
+      "password": "",
+      "courseId": "software-dev",
+      "expected": "Rejected"
+    },
+    {
+      "id": "R09",
+      "scenario": "Missing course",
+      "displayName": "Test No Course",
+      "email": "r09@example.com",
+      "password": "TestPass-R09!",
+      "courseId": "",
+      "expected": "Rejected"
+    },
+    {
+      "id": "R10",
+      "scenario": "Unknown course ID",
+      "displayName": "Test Unknown Course",
+      "email": "r10@example.com",
+      "password": "TestPass-R10!",
+      "courseId": "unknown-course",
+      "expected": "Rejected"
+    },
+    {
+      "id": "R11",
+      "scenario": "Inactive course ID",
+      "displayName": "Test Inactive Course",
+      "email": "r11@example.com",
+      "password": "TestPass-R11!",
+      "courseId": "data-science",
+      "expected": "Rejected (course exists but is inactive; it is marked inactive on the Vocabulary sheet)"
+    },
+    {
+      "id": "R12",
+      "scenario": "Non-string input types",
+      "displayName": "Test Types",
+      "email": "r12@example.com",
+      "password": "12345",
+      "courseId": "software-dev",
+      "expected": "Handled safely (try numbers/objects in JSON fields); no server error"
+    }
+  ],
+  "photoCases": [
+    {
+      "id": "P01",
+      "case": "JPG, 200 KB",
+      "expected": "Accepted"
+    },
+    {
+      "id": "P02",
+      "case": "PNG, 200 KB",
+      "expected": "Accepted"
+    },
+    {
+      "id": "P03",
+      "case": "WebP, 200 KB",
+      "expected": "Accepted"
+    },
+    {
+      "id": "P04",
+      "case": "JPG just under 5 MB",
+      "expected": "Accepted"
+    },
+    {
+      "id": "P05",
+      "case": "JPG just over 5 MB",
+      "expected": "Rejected with a clear error"
+    },
+    {
+      "id": "P06",
+      "case": "GIF image",
+      "expected": "Rejected (only JPG, PNG, WebP allowed)"
+    },
+    {
+      "id": "P07",
+      "case": "PDF renamed to .jpg",
+      "expected": "Rejected (content must be checked, not just the extension)"
+    },
+    {
+      "id": "P08",
+      "case": "Remove existing photo",
+      "expected": "photoUrl returns to null; file removed from disk"
+    },
+    {
+      "id": "P09",
+      "case": "Upload while signed out",
+      "expected": "Denied"
+    },
+    {
+      "id": "P10",
+      "case": "Upload to another user's profile",
+      "expected": "Denied (ownership check)"
+    }
+  ]
+}
