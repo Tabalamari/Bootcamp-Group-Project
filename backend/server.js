@@ -1170,6 +1170,511 @@ app.post('/api/conversations/:id/read', authMiddleware, (req, res) => {
   }
 });
 
+// -------------------------------------------------------------
+// Administrator Role-Based Authorization Middleware (FR-05)
+// -------------------------------------------------------------
+function adminMiddleware(req, res, next) {
+  authMiddleware(req, res, () => {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Administrator access required' });
+    }
+    next();
+  });
+}
+
+// Helper to normalize names: trim and collapse internal repeated whitespaces
+function normalizeName(name) {
+  if (typeof name !== 'string') return '';
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+// Managed list tables configuration
+const ADMIN_MANAGED_TABLES = {
+  categories: { table: 'categories', hasCategory: false },
+  skills: { table: 'skills', hasCategory: true },
+  interests: { table: 'interests', hasCategory: true },
+  courses: { table: 'courses', hasCategory: false }
+};
+
+// -------------------------------------------------------------
+// 19. Administrator Workspace Data (GET /api/admin/workspace & /api/admin/load)
+// -------------------------------------------------------------
+app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, (req, res) => {
+  try {
+    const categories = db.prepare('SELECT id, name, is_active FROM categories ORDER BY name ASC').all().map(c => ({
+      id: c.id,
+      name: c.name,
+      active: Boolean(c.is_active)
+    }));
+
+    const skills = db.prepare('SELECT id, name, category_id, is_active FROM skills ORDER BY name ASC').all().map(s => ({
+      id: s.id,
+      name: s.name,
+      categoryId: s.category_id || '',
+      active: Boolean(s.is_active)
+    }));
+
+    const interests = db.prepare('SELECT id, name, category_id, is_active FROM interests ORDER BY name ASC').all().map(i => ({
+      id: i.id,
+      name: i.name,
+      categoryId: i.category_id || '',
+      active: Boolean(i.is_active)
+    }));
+
+    const courses = db.prepare('SELECT id, name, is_active FROM courses ORDER BY name ASC').all().map(c => ({
+      id: c.id,
+      name: c.name,
+      active: Boolean(c.is_active)
+    }));
+
+    const usersRows = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status,
+        courses.name AS course_name,
+        profiles.bio,
+        profiles.photo_url
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      LEFT JOIN profiles ON users.id = profiles.user_id
+      ORDER BY users.display_name ASC
+    `).all();
+
+    const users = usersRows.map(u => {
+      const userSkills = db.prepare(`
+        SELECT skills.name FROM profile_skills
+        JOIN skills ON profile_skills.skill_id = skills.id
+        WHERE profile_skills.user_id = ?
+        ORDER BY skills.name ASC
+      `).all(u.id).map(r => r.name);
+
+      const userInterests = db.prepare(`
+        SELECT interests.name FROM profile_interests
+        JOIN interests ON profile_interests.interest_id = interests.id
+        WHERE profile_interests.user_id = ?
+        ORDER BY interests.name ASC
+      `).all(u.id).map(r => r.name);
+
+      const userGoals = db.prepare(`
+        SELECT connection_goals.name FROM profile_goals
+        JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
+        WHERE profile_goals.user_id = ?
+        ORDER BY connection_goals.name ASC
+      `).all(u.id).map(r => r.name);
+
+      return {
+        id: u.id,
+        displayName: u.display_name,
+        email: u.email,
+        courseId: u.course_id,
+        courseName: u.course_name,
+        role: u.role,
+        status: u.status,
+        bio: u.bio || '',
+        photoUrl: u.photo_url || null,
+        skills: userSkills,
+        interests: userInterests,
+        goals: userGoals
+      };
+    });
+
+    res.json({
+      categories,
+      skills,
+      interests,
+      courses,
+      users
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load administrator workspace' });
+  }
+});
+
+// -------------------------------------------------------------
+// 20. Administrator Users List (GET /api/admin/users)
+// -------------------------------------------------------------
+app.get('/api/admin/users', adminMiddleware, (req, res) => {
+  try {
+    const query = (req.query.query || '').trim().toLowerCase();
+    const statusFilter = req.query.status || 'all';
+
+    const usersRows = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status,
+        courses.name AS course_name,
+        profiles.bio,
+        profiles.photo_url
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      LEFT JOIN profiles ON users.id = profiles.user_id
+      ORDER BY users.display_name ASC
+    `).all();
+
+    const filtered = usersRows.filter(u => {
+      const matchQuery = !query || 
+        u.display_name.toLowerCase().includes(query) || 
+        u.email.toLowerCase().includes(query);
+      const matchStatus = statusFilter === 'all' || u.status === statusFilter;
+      return matchQuery && matchStatus;
+    });
+
+    const users = filtered.map(u => {
+      const userSkills = db.prepare(`
+        SELECT skills.name FROM profile_skills
+        JOIN skills ON profile_skills.skill_id = skills.id
+        WHERE profile_skills.user_id = ?
+        ORDER BY skills.name ASC
+      `).all(u.id).map(r => r.name);
+
+      const userInterests = db.prepare(`
+        SELECT interests.name FROM profile_interests
+        JOIN interests ON profile_interests.interest_id = interests.id
+        WHERE profile_interests.user_id = ?
+        ORDER BY interests.name ASC
+      `).all(u.id).map(r => r.name);
+
+      return {
+        id: u.id,
+        displayName: u.display_name,
+        email: u.email,
+        courseId: u.course_id,
+        courseName: u.course_name,
+        role: u.role,
+        status: u.status,
+        bio: u.bio || '',
+        photoUrl: u.photo_url || null,
+        skills: userSkills,
+        interests: userInterests
+      };
+    });
+
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve users' });
+  }
+});
+
+// -------------------------------------------------------------
+// 21. Administrator User Inspection Detail (GET /api/admin/users/:id)
+// -------------------------------------------------------------
+app.get('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  try {
+    const user = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status,
+        courses.name AS course_name,
+        profiles.bio,
+        profiles.photo_url
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      LEFT JOIN profiles ON users.id = profiles.user_id
+      WHERE users.id = ?
+    `).get(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const skills = db.prepare(`
+      SELECT skills.name FROM profile_skills
+      JOIN skills ON profile_skills.skill_id = skills.id
+      WHERE profile_skills.user_id = ?
+      ORDER BY skills.name ASC
+    `).all(user.id).map(r => r.name);
+
+    const interests = db.prepare(`
+      SELECT interests.name FROM profile_interests
+      JOIN interests ON profile_interests.interest_id = interests.id
+      WHERE profile_interests.user_id = ?
+      ORDER BY interests.name ASC
+    `).all(user.id).map(r => r.name);
+
+    const goals = db.prepare(`
+      SELECT connection_goals.name FROM profile_goals
+      JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
+      WHERE profile_goals.user_id = ?
+      ORDER BY connection_goals.name ASC
+    `).all(user.id).map(r => r.name);
+
+    // Explicitly exclude private messages to guarantee privacy
+    res.json({
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email,
+      courseId: user.course_id,
+      courseName: user.course_name,
+      role: user.role,
+      status: user.status,
+      bio: user.bio || '',
+      photoUrl: user.photo_url || null,
+      skills,
+      interests,
+      goals
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to inspect user' });
+  }
+});
+
+// -------------------------------------------------------------
+// 22. Administrator User Moderation / Suspension (PATCH /api/admin/users/:id)
+// -------------------------------------------------------------
+app.patch('/api/admin/users/:id', adminMiddleware, (req, res) => {
+  try {
+    const user = db.prepare('SELECT id, course_id, status FROM users WHERE id = ?').get(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'This user is unavailable' });
+    }
+
+    const { courseId, status } = req.body || {};
+    let updatedCourseId = user.course_id;
+    let updatedStatus = user.status;
+    let revokedSessions = 0;
+
+    // Validate course assignment correction
+    if (courseId !== undefined && courseId !== user.course_id) {
+      const activeCourse = db.prepare('SELECT id FROM courses WHERE id = ? AND is_active = 1').get(courseId);
+      if (!activeCourse) {
+        return res.status(400).json({ error: 'Choose an active course' });
+      }
+      updatedCourseId = activeCourse.id;
+    }
+
+    // Validate status change
+    if (status !== undefined) {
+      if (!['active', 'suspended'].includes(status)) {
+        return res.status(400).json({ error: 'Choose a valid account status' });
+      }
+      updatedStatus = status;
+
+      // Acceptance Criterion 7: Suspension revokes access immediately
+      if (status === 'suspended') {
+        const result = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+        revokedSessions = result.changes;
+      }
+    }
+
+    db.prepare('UPDATE users SET course_id = ?, status = ? WHERE id = ?').run(updatedCourseId, updatedStatus, user.id);
+
+    const updatedUser = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status,
+        courses.name AS course_name
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      WHERE users.id = ?
+    `).get(user.id);
+
+    res.json({
+      id: updatedUser.id,
+      displayName: updatedUser.display_name,
+      courseId: updatedUser.course_id,
+      courseName: updatedUser.course_name,
+      status: updatedUser.status,
+      revokedSessions
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// -------------------------------------------------------------
+// 23. List Managed Records (GET /api/admin/:kind)
+// -------------------------------------------------------------
+app.get('/api/admin/:kind', adminMiddleware, (req, res) => {
+  try {
+    const config = ADMIN_MANAGED_TABLES[req.params.kind];
+    if (!config) {
+      return res.status(404).json({ error: 'Unknown managed list' });
+    }
+
+    const rows = db.prepare(`SELECT * FROM ${config.table} ORDER BY name ASC`).all();
+    const records = rows.map(r => {
+      const item = {
+        id: r.id,
+        name: r.name,
+        active: Boolean(r.is_active)
+      };
+      if (config.hasCategory) {
+        item.categoryId = r.category_id || '';
+      }
+      return item;
+    });
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve managed records' });
+  }
+});
+
+// -------------------------------------------------------------
+// 24. Create Managed Record (POST /api/admin/:kind)
+// -------------------------------------------------------------
+app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
+  try {
+    const config = ADMIN_MANAGED_TABLES[req.params.kind];
+    if (!config) {
+      return res.status(404).json({ error: 'Unknown managed list' });
+    }
+
+    const { name, categoryId } = req.body || {};
+    const normalized = normalizeName(name);
+
+    if (!normalized || normalized.length > 80) {
+      return res.status(400).json({ error: 'Enter a name between 1 and 80 characters' });
+    }
+
+    // Duplicate check across existing names in this managed list (case-insensitive)
+    const duplicate = db.prepare(`SELECT id FROM ${config.table} WHERE LOWER(name) = LOWER(?)`).get(normalized);
+    if (duplicate) {
+      return res.status(409).json({ error: 'This name already exists in this list' });
+    }
+
+    // Category association validation for skills and interests
+    let validCategoryId = null;
+    if (config.hasCategory && categoryId) {
+      const cat = db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
+      if (!cat || !cat.is_active) {
+        return res.status(400).json({ error: 'Choose an active category' });
+      }
+      validCategoryId = cat.id;
+    }
+
+    // Generate unique ID
+    let newId = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (!newId || db.prepare(`SELECT id FROM ${config.table} WHERE id = ?`).get(newId)) {
+      newId = `${newId || req.params.kind.slice(0, -1)}-${crypto.randomUUID().slice(0, 8)}`;
+    }
+
+    if (config.hasCategory) {
+      db.prepare(`
+        INSERT INTO ${config.table} (id, name, category_id, is_active)
+        VALUES (?, ?, ?, 1)
+      `).run(newId, normalized, validCategoryId);
+    } else {
+      db.prepare(`
+        INSERT INTO ${config.table} (id, name, is_active)
+        VALUES (?, ?, 1)
+      `).run(newId, normalized);
+    }
+
+    const created = {
+      id: newId,
+      name: normalized,
+      active: true
+    };
+    if (config.hasCategory) {
+      created.categoryId = validCategoryId || '';
+    }
+
+    res.status(201).json(created);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create managed record' });
+  }
+});
+
+// -------------------------------------------------------------
+// 25. Update or Deactivate Managed Record (PATCH /api/admin/:kind/:id)
+// -------------------------------------------------------------
+app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
+  try {
+    const config = ADMIN_MANAGED_TABLES[req.params.kind];
+    if (!config) {
+      return res.status(404).json({ error: 'Unknown managed list' });
+    }
+
+    const record = db.prepare(`SELECT * FROM ${config.table} WHERE id = ?`).get(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: 'This record is unavailable' });
+    }
+
+    const { name, categoryId, active, isActive } = req.body || {};
+    let updatedName = record.name;
+    let updatedCategoryId = config.hasCategory ? record.category_id : null;
+    let updatedActive = record.is_active;
+
+    if (name !== undefined) {
+      const normalized = normalizeName(name);
+      if (!normalized || normalized.length > 80) {
+        return res.status(400).json({ error: 'Enter a name between 1 and 80 characters' });
+      }
+      const duplicate = db.prepare(`
+        SELECT id FROM ${config.table} 
+        WHERE LOWER(name) = LOWER(?) AND id != ?
+      `).get(normalized, req.params.id);
+
+      if (duplicate) {
+        return res.status(409).json({ error: 'This name already exists in this list' });
+      }
+      updatedName = normalized;
+    }
+
+    if (config.hasCategory && categoryId !== undefined) {
+      if (categoryId && categoryId !== record.category_id) {
+        const cat = db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
+        if (!cat || !cat.is_active) {
+          return res.status(400).json({ error: 'Choose an active category' });
+        }
+        updatedCategoryId = cat.id;
+      } else if (!categoryId) {
+        updatedCategoryId = null;
+      }
+    }
+
+    if (active !== undefined) {
+      updatedActive = active ? 1 : 0;
+    } else if (isActive !== undefined) {
+      updatedActive = isActive ? 1 : 0;
+    }
+
+    if (config.hasCategory) {
+      db.prepare(`
+        UPDATE ${config.table}
+        SET name = ?, category_id = ?, is_active = ?
+        WHERE id = ?
+      `).run(updatedName, updatedCategoryId, updatedActive, req.params.id);
+    } else {
+      db.prepare(`
+        UPDATE ${config.table}
+        SET name = ?, is_active = ?
+        WHERE id = ?
+      `).run(updatedName, updatedActive, req.params.id);
+    }
+
+    const result = {
+      id: record.id,
+      name: updatedName,
+      active: Boolean(updatedActive)
+    };
+    if (config.hasCategory) {
+      result.categoryId = updatedCategoryId || '';
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update managed record' });
+  }
+});
+
 // Start the server if file is executed directly
 if (require.main === module) {
   app.listen(PORT, () => {
