@@ -24,26 +24,26 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 
 ## Feature status
 
-| Feature                                                             | Malak: frontend                                                         | Marianna: backend                                                                       | Qingling: git, data and verification | Integration                                   |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
-| F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                            | Implemented; 19 backend checks passed, with validation/test-isolation fixes             | Independent verification pending     | Local integration passed; team review pending |
-| F2 Profile viewing/editing and profile photos                       | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F4 Conversations, messages and unread indicators                    | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
-| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`   | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
-| F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
+| Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
+| --- | --- | --- | --- | --- |
+| F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
+| F2 Profile viewing/editing and profile photos | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F3 Discovery, filters and fit explanations | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F4 Conversations, messages and unread indicators | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
+| F5 Administration: users, courses, categories, skills and interests | **Connected locally**, 8 Oct 2026; `feature/integrate-administration` | Implemented; 61 backend checks passed | Independent verification pending | Connected locally; adapter tests and backend suite passed; admin browser smoke check passed; mutation walkthrough and independent verification pending |
+| F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
 
 ## Assignments for the remaining features
 
-| Feature             | Malak can build now                                                                                                                                                              | Marianna implements later                                                                                                                              | Qingling prepares and verifies                                                                                                                            |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F2 Profiles         | Profile display/editor; bio, skills, interests and goals; photo picker, preview, enlargement, edit and removal; validation and save/error states using a sample profile service. | Profile read/update operations; ownership checks; photo upload/storage and file validation; persistent skill/interest relationships.                   | Representative complete/empty profiles; valid/invalid photos; correct saved fields; ownership and photo-access checks after integration.                  |
-| F3 Discovery        | Profile cards, filters, empty/loading/error states and explanations derived from sample profiles.                                                                                | Filter/query operations; eligible-user rules; pagination; factual fit data without exposing private account fields.                                    | Expected filter results, combined-filter cases, fit explanations and checks that suspended users/private fields are excluded.                             |
-| F4 Messaging        | Conversation list; separate histories and drafts; open/reopen chats; send/retry states; unread badges and sample incoming-message alerts; mobile conversation navigation.        | Persistent conversations/messages; participant-only access; duplicate-conversation prevention; unread/read state; agreed message update mechanism.     | Multiple conversations and incoming-message fixtures; message order; unread clearing; isolation between chats; third-party access denial and persistence. |
-| F5 Administration   | Screens for users and managed lists; create/edit/deactivate flows, confirmations, validation and failure states using sample services.                                           | Administrator authorization; list management; duplicate rules; reference-preserving deactivation; user suspension/reactivation and session revocation. | Duplicate/inactive values; existing references; role restrictions; suspended-user behavior; changes reflected in learner screens.                         |
-| F6 Account settings | Editable name/course and password-change form; reauthentication prompts; success/error states using sample services.                                                             | Authenticated account updates; password verification/change; session handling; server-side validation.                                                 | Correct updates; invalid credentials; course validity; unauthorized changes and session behavior after password changes.                                  |
+| Feature | Malak can build now | Marianna implements later | Qingling prepares and verifies |
+| --- | --- | --- | --- |
+| F2 Profiles | Profile display/editor; bio, skills, interests and goals; photo picker, preview, enlargement, edit and removal; validation and save/error states using a sample profile service. | Profile read/update operations; ownership checks; photo upload/storage and file validation; persistent skill/interest relationships. | Representative complete/empty profiles; valid/invalid photos; correct saved fields; ownership and photo-access checks after integration. |
+| F3 Discovery | Profile cards, filters, empty/loading/error states and explanations derived from sample profiles. | Filter/query operations; eligible-user rules; pagination; factual fit data without exposing private account fields. | Expected filter results, combined-filter cases, fit explanations and checks that suspended users/private fields are excluded. |
+| F4 Messaging | Conversation list; separate histories and drafts; open/reopen chats; send/retry states; unread badges and sample incoming-message alerts; mobile conversation navigation. | Persistent conversations/messages; participant-only access; duplicate-conversation prevention; unread/read state; agreed message update mechanism. | Multiple conversations and incoming-message fixtures; message order; unread clearing; isolation between chats; third-party access denial and persistence. |
+| F5 Administration | Connected frontend for users and managed lists; review/fix integration issues on `feature/integrate-administration`. | F5 API implemented: administrator authorization, list management, duplicate rules, reference-preserving deactivation, user suspension/reactivation and session revocation. Review the integration. | Independently verify duplicate/inactive values, existing references, role restrictions, suspended-user behavior and changes reflected in learner screens. |
+| F6 Account settings | Editable name/course and password-change form; reauthentication prompts; success/error states using sample services. | Authenticated account updates; password verification/change; session handling; server-side validation. | Correct updates; invalid credentials; course validity; unauthorized changes and session behavior after password changes. |
 
 Every frontend feature must support desktop, laptop and mobile, keyboard operation, relevant validation, loading, empty and error states. Keep all sample credentials/data fictional, and keep sample services replaceable by real API adapters.
 
@@ -73,37 +73,6 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Marianna next: profile/options endpoints, persistent relationships, ownership rules, photo storage/upload/removal and consistent Save/Cancel behavior.
 - Qingling next: independently verify profile fields, user isolation, file errors, save/cancel and responsive layouts; verify real persistence and authorization after integration.
 
-### F2 - Backend completed on 5 October 2026
-
-- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/README.md](backend/README.md).
-- Delivered:
-  - Persistent SQLite tables: `skills`, `interests`, `connection_goals`, `profiles`, `profile_skills`, `profile_interests`, `profile_goals` with foreign key integrity, cascade deletion, and seed data matching Malak's frontend vocabulary.
-  - Endpoints implemented:
-    - `GET /api/profile-options` (and `/api/profile/options`): returns active vocabulary for skills, interests, and goals.
-    - `GET /api/profiles/me` (and `/api/profile/me`): returns authenticated learner profile with display name, course, bio, photoUrl or null, and selected options.
-    - `PATCH /api/profiles/me` (and `/api/profile/me`, `PUT`): atomic transaction updating display name, bio, skills, interests, and goals with validation (name length 2-80, bio max 500, vocabulary checks).
-    - `POST /api/profiles/me/photo`: multipart upload via `multer` with format checks (JPG, PNG, WebP only) and 5 MB size limit.
-    - `DELETE /api/profiles/me/photo`: removes photo file from disk and resets database photoUrl to null.
-    - `GET /api/profiles/:userId`: public profile view for other learners, strictly excluding email, password_hash, role, and private fields; blocks suspended users.
-- Checks: 27 automated tests passing in [backend/test.js](backend/test.js) covering all 7 FR-02 acceptance criteria.
-- Qingling next: independently verify profile fields, persistence across sessions, file errors, and direct unauthorized requests.
-- Malak next: review the locally integrated profile flow; Qingling's independent verification remains pending.
-
-### F3 - Backend completed on 6 October 2026
-
-- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
-- Delivered:
-  - Discovery filtering endpoint: `GET /api/profiles` with text search query, course filter, multi-select skills, interests, and goals.
-  - Filter logic: OR within each multi-select group, AND across groups, clear filters returns full community list.
-  - Server-enforced exclusion of viewer (`req.user.id`) and suspended accounts (`status === 'active'`).
-  - Factual explainable fit engine (`calculateFitReasons`): shared interests, shared skills, shared goals, cross-course collaboration, and fallback to `"No shared criteria found yet."`.
-  - Updated `GET /api/profiles/:userId` to include consistent `fitReasons`.
-  - Strict privacy protection: private account fields (`email`, `password_hash`, `role`, `status`) omitted from all responses.
-  - Pagination support: `page`, `limit`, `total`, `totalPages`.
-- Checks: 40 automated tests passing in [backend/test.js](backend/test.js) covering all 9 FR-03 acceptance criteria.
-- Qingling next: independently verify combined filters, fit explanations across course pairs, search results, and privacy rules.
-- Malak next: review the locally integrated discovery flow; Qingling's independent verification remains pending.
-
 ### Record for each subsequent completed frontend feature
 
 Add a dated entry with: feature ID; owner; branch and implementation location; delivered behavior; actual check results; sample-data limitations; proposed API contract; and explicit next actions for Marianna, Qingling and Malak. Only mark the frontend column done; leave backend, verification and integration statuses unchanged unless evidence supports updating them.
@@ -116,11 +85,11 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ## Ownership
 
-| Team member | Strength                       | Responsibility                                                                                    |
-| ----------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Malak       | Frontend                       | Registration and login interface, course selection, sign-out, and protected welcome page.         |
-| Marianna    | Backend                        | Account creation, authentication, sessions, available-course data endpoint, and protected access. |
-| Qingling    | Data analysis and verification | Initial course data, test data, data validation, and verification of the complete feature.        |
+| Team member | Strength | Responsibility |
+| --- | --- | --- |
+| Malak | Frontend | Registration and login interface, course selection, sign-out, and protected welcome page. |
+| Marianna | Backend | Account creation, authentication, sessions, available-course data endpoint, and protected access. |
+| Qingling | Data analysis and verification | Initial course data, test data, data validation, and verification of the complete feature. |
 
 ## Malak - Frontend
 
@@ -132,7 +101,7 @@ Registration, course selection, login, a welcome screen and logout are available
 
 Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
 
-Current next steps: complete authenticated F4 messaging verification, then connect F5/F6 when their backend APIs are ready. F2/F3 are already integrated locally; Qingling's independent verification remains pending. Setup instructions and API details are in [frontend/README.md](frontend/README.md).
+Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is completed with sample data; F6 account settings is completed with sample data. Next: frontend review, backend integration and independent verification. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
 
 ### Tasks
 
@@ -231,7 +200,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification and merge approval remain open. F4's authenticated two-account adapter/API test has passed on `feature/integrate-messaging`; a browser walkthrough with team accounts and independent review remain pending. Application changes have not been merged into main.
+F1 local integration checks pass. Independent team verification and merge approval remain open. Current review work is on `feature/integrate-profiles-discovery`, based on F6. Marianna’s F2/F3 backend is integrated with Malak’s frontend on its own branch; application changes are not merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -251,9 +220,9 @@ The feature is complete when all three contributions work together and the share
 - Passed: 19 backend checks, seven frontend tests, production build and real browser checks for registration, session restoration, login failures, duplicate email, logout token revocation and invalid-session recovery.
 - Marianna: review the small backend changes; add rate limiting, session expiry and remaining F6 account operations before treating full FR-01 as complete. SQLite is the implemented database; any PostgreSQL migration needs a team decision.
 - Qingling: independently verify the integrated feature and record outcomes. Her status remains pending.
-- Malak: F2/F3 are integrated locally on `feature/integrate-profiles-discovery`; F4 messaging connection is in progress on `feature/integrate-messaging`.
+- Malak: review the connected UI, then continue F3; F2 integration awaits profile endpoints.
 - Details and startup instructions: [frontend/INTEGRATION.md](frontend/INTEGRATION.md).
-- F2 and F1 integration commit `f79625a` is included in the published F3 branch. The separate F2 branch is now published to origin. Only this tracker update is being shared on main.
+- F2/F3 frontend and backend integration is published on `feature/integrate-profiles-discovery`; see [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Qingling’s independent verification remains pending.
 
 ## F3 frontend completion - 5 October 2026
 
@@ -261,19 +230,14 @@ The feature is complete when all three contributions work together and the share
 - Checks: build and 10 frontend tests passed; browser search/detail/empty/filter/reset flows passed; no overflow at 320, 390, 1024 or 1440px; desktop visual reviewed.
 - Marianna: implement authenticated discovery/detail queries, managed options, pagination and server-side privacy/eligibility checks.
 - Qingling: independently verify filtering/fit evidence, then real data and privacy after backend integration.
-- Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). The 5 October frontend completion used sample data; F3 backend integration is recorded below.
-- F3 is published to origin/feature/frontend-discovery. The current local working branch is feature/frontend-account-settings. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
+- Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
+- F3 is published to origin/feature/frontend-discovery. F2/F3 integration is published on feature/integrate-profiles-discovery for review.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
-- Malak next: finish authenticated F4 messaging verification, then integrate F5-F6 when their backend endpoints are available.
+- Malak next: review connected F2/F3 and F4 messaging, then integrate F5-F6 as backend endpoints become available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
 
 - Design: restored the left sidebar on desktop/laptop and compact mobile navigation.
 - Tracker reconciliation: consolidated duplicate outdated F1-F3 rows from main; current statuses and Marianna's completed F1 work are retained.
-
-## F2/F3 backend integration - 7 October 2026
-
-- Connected profile viewing/editing and discovery/filtering to Marianna's APIs on `feature/integrate-profiles-discovery`.
-- Checks: the F1–F3 backend suite passed 40 checks; local F2/F3 integration and frontend checks passed. Independent verification by Qingling remains pending.
 
 ## F4 frontend implementation - 5 October 2026
 
@@ -285,11 +249,12 @@ The feature is complete when all three contributions work together and the share
 
 ## F4 backend integration - 8 October 2026
 
-- Connected the inbox, conversation history, send, read state, inbox refresh and unread badge to Marianna's authenticated messaging APIs on `feature/integrate-messaging`.
-- Checks: 51 backend checks, 18 frontend tests and the production build passed. An isolated in-memory test used the actual frontend adapter with two authenticated accounts to verify conversation reuse, sending, ordered history, sender labels, unread clearing and account-isolated drafts/history; a third account was denied access (403). The Vite proxy returns 200 for courses and 401 for messaging without a token.
-- A stale local backend initially returned 404 for messaging; it was restarted from the current F4-enabled source.
-- Qingling: independently verify authenticated two-account conversations, message order and persistence, unread clearing and participant isolation.
-- Remaining: Qingling's independent verification and a browser walkthrough with team accounts. F4 application changes are committed locally on `feature/integrate-messaging` and have not been pushed.
+- Imported Marianna's merged FR-04 backend from `origin/main` into `feature/integrate-messaging` and connected the messaging UI to the authenticated conversation, history, send, read and inbox endpoints.
+- Conversation lists and message history now persist through the API; unread counts refresh every 20 seconds and on demand. The demo-only incoming-message controls remain limited to demo mode.
+- Checks: 51 backend checks, 18 frontend tests and the production build passed. An isolated in-memory test used the actual frontend messaging adapter with two authenticated accounts to verify conversation reuse, sending, ordered history, sender labels, unread clearing and account-isolated drafts/history. A third account was denied access (403). The Vite proxy reaches the protected messaging route (401 without a token); a stale local backend initially returned 404 and was restarted from the current source.
+- Qingling: independently verify two-account conversation flow, message persistence, ordering, unread clearing and participant isolation.
+- Remaining: independent verification by Qingling and a browser walkthrough using real team accounts. The F4 connection is being committed locally on `feature/integrate-messaging`; the application branch is not pushed.
+
 
 ## F5 frontend completion - 5 October 2026
 
@@ -298,8 +263,9 @@ The feature is complete when all three contributions work together and the share
 - Limits: isolated sample admin workspace; changes reset on reload and do not propagate to learner screens or real accounts. Role switch is preview-only, not server authorization. Session revocation and cross-screen managed data integration remain pending.
 - Marianna: protected administration APIs, stable managed IDs, reference preservation, persistence, role enforcement, session revocation and learner API integration.
 - Qingling: independent admin workflow, inactive-reference, duplicate and responsive checks; verify direct API authorization, persistence and suspension across learner screens after integration.
-- Malak next: frontend review and F2-F6 integration as backend endpoints become available.
+- Malak next: review the connected F2/F3 flows, then integrate F4-F6 as backend endpoints become available.
 - Handoff: [F5 administration handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-administration/frontend/ADMIN_HANDOFF.md). F5 is published to origin/feature/frontend-administration; only this tracker is updated on main. Application changes are not merged into main.
+
 
 ## F6 frontend completion - 5 October 2026
 
@@ -310,3 +276,21 @@ The feature is complete when all three contributions work together and the share
 - Qingling: independent form checks, then persistence, real password login, session handling, authorization and cross-screen consistency after integration.
 - Malak next: frontend review and integration as backend endpoints become available.
 - Handoff: [F6 account settings handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-account-settings/frontend/SETTINGS_HANDOFF.md). F6 is published to origin/feature/frontend-account-settings. Only this tracker is updated on main; application changes are not merged into main.
+
+## F2/F3 local integration - 7 October 2026
+
+- Integrated Marianna’s F2/F3 backend from origin/main with Malak’s profile and discovery screens on `feature/integrate-profiles-discovery`, based on F6. Published for review; not merged into main.
+- Profiles and managed options load from the API; profile edits persist; photo upload/removal uses protected endpoints. Discovery search, filters, profile details, fit explanations and pagination use protected APIs.
+- Checks: backend suite 40/40; frontend suite 18/18; production build passed. Real browser journey passed profile save, photo upload/removal/persistence, server search/detail/fit/privacy/pagination, and 320/390/1024/1440 px layouts using temporary fictional accounts and an in-memory database.
+- Qingling: independently verify; status remains pending. Marianna: review integration and advise on F6 account/password endpoints. F6 remains a sample preview.
+- Handoff: [frontend/F2_F3_INTEGRATION.md](frontend/F2_F3_INTEGRATION.md). Application changes are on the integration branch; main remains unchanged.
+
+## F5 local integration - 8 October 2026
+
+- Imported Marianna's FR-05 backend from `origin/FR-05--administration` onto `feature/integrate-administration`, based on the F4 integration branch. Connected the admin workspace, managed category/skill/interest/course create/edit/deactivate/reactivate operations, and learner course/status updates to the authenticated administrator API.
+- The signed-in account role now controls the real admin page; the sample role switch remains available only in demo mode. The user inspection view displays account/profile details while continuing to exclude private conversations.
+- Checks: frontend tests 21/21; production build passed; Marianna's full backend API suite passed 61/61, including admin login/workspace access, learner 403 and unauthenticated 401, managed-list validation, course correction, suspension/session revocation and private-message privacy. Added adapter tests for authenticated workspace loading, managed-list/user mutations and authorization errors.
+- Browser smoke check: signed in as the seeded administrator and confirmed the live Admin page loads the real user directory and categories from the backend. Still to verify interactively: create/edit/deactivate/reactivate and user course/status changes. Qingling's independent verification is pending, so do not mark FR-05 independently verified yet.
+- Marianna: review the frontend/API connection on `feature/integrate-administration`.
+- Qingling: independently verify admin workflows, role denial, persistence, suspension effects and privacy guarantees.
+- Malak: complete browser walkthrough and address review feedback. Application changes remain off `main`; publish/merge only when agreed.
