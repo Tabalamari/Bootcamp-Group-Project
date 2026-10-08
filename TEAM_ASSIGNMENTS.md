@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 5 October 2026
+Last updated: 8 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-05
 
@@ -29,8 +29,8 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria | Awaiting confirmation | Pending integration |
 | F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Implemented; 40 backend checks passed (F1, F2 & F3), covering all 9 acceptance criteria | Awaiting confirmation | Pending integration |
-| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Implemented; 51 backend checks passed (F1, F2, F3 & F4), covering all 10 acceptance criteria | Awaiting confirmation | Pending integration |
+| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Implemented; 61 backend checks passed (F1 through F5), covering all 8 acceptance criteria | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
@@ -103,6 +103,41 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Checks: 40 automated tests passing in [backend/test.js](backend/test.js) covering all 9 FR-03 acceptance criteria.
 - Qingling next: independently verify combined filters, fit explanations across course pairs, search results, and privacy rules.
 - Malak next: connect frontend `discoveryService.js` to real backend endpoints.
+
+### F4 - Backend completed on 7 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - SQLite schema for `conversations`, `messages`, and `conversation_reads` tables with canonical participant ordering to prevent duplicates.
+  - Endpoints implemented:
+    - `GET /api/conversations`: lists user's conversations with other participant summary, last message preview, unread count, sorted by latest activity descending.
+    - `POST /api/conversations`: starts or reuses 1-on-1 conversations with deduplication and optional initial text message.
+    - `GET /api/conversations/:id/messages`: chronological message history with server-enforced 2-participant isolation.
+    - `POST /api/conversations/:id/messages`: sends text message (1-2000 chars) with suspension checks.
+    - `POST /api/conversations/:id/read`: clears unread message count for that conversation.
+  - Security & privacy: server-enforced isolation (403 for third parties), self-messaging rejection (400), suspended account blocking for senders and recipients (403), private fields (email, password_hash, role) strictly omitted.
+- Checks: 51 automated tests passing in [backend/test.js](backend/test.js) covering all 10 FR-04 acceptance criteria.
+- Qingling next: independently verify message order, chat isolation, unread clearing, direct API authorization, and persistence.
+- Malak next: connect frontend `messagingService.js` to real backend endpoints.
+
+### F5 - Backend completed on 8 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - SQLite schema updates: `categories` table (`id`, `name`, `is_active`) and `category_id` foreign key migrated to `skills` and `interests`.
+  - Default administrator account seeded: `admin@example.com` (`AdminPassword123!`) with `role === 'admin'`.
+  - Endpoints implemented:
+    - `GET /api/admin/workspace` (and `/api/admin/load`): consolidated workspace state snapshot (counts, managed lists, categories, user directory).
+    - `GET /api/admin/users`: lists users with status filter (`all`, `active`, `suspended`) and text search query across name and email.
+    - `GET /api/admin/users/:id`: inspects user profile while strictly excluding private messages and conversations to guarantee student privacy.
+    - `PATCH /api/admin/users/:id`: corrects course assignment and moderates user status; suspending a user immediately purges active sessions (`DELETE FROM sessions WHERE user_id = ?`) and blocks login.
+    - `GET /api/admin/:kind`: retrieves managed taxonomy records (`skills`, `interests`, `courses`, `connection-goals`, `categories`) including inactive items.
+    - `POST /api/admin/:kind`: creates new taxonomy item with normalized duplicate check and active category validation.
+    - `PATCH /api/admin/:kind/:id`: updates name, category association, and soft deactivation/activation (`is_active: 0/1`) without physical deletion to preserve historical references.
+  - Role-based authorization: `adminMiddleware` strictly gates all `/api/admin/*` endpoints (`401 Unauthorized` for unauthenticated, `403 Forbidden` for learners).
+- Checks: 61 automated tests passing in [backend/test.js](backend/test.js) covering all 8 FR-05 acceptance criteria.
+- Qingling next: independently verify admin authorization, category filtering, duplicate rejection, soft deactivation, session revocation, and learner privacy.
+- Malak next: connect frontend `adminService.js` to real backend endpoints.
 
 ### Record for each subsequent completed frontend feature
 
