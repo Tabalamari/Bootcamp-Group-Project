@@ -24,26 +24,26 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 
 ## Feature status
 
-| Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
-| --- | --- | --- | --- | --- |
-| F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
-| F2 Profile viewing/editing and profile photos | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile` | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria | Awaiting confirmation | Pending integration |
-| F3 Discovery, filters and fit explanations | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery` | Implemented; 40 backend checks passed (F1, F2 & F3), covering all 9 acceptance criteria | Awaiting confirmation | Pending integration |
-| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
-| F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| Feature                                                             | Malak: frontend                                                         | Marianna: backend                                                                       | Qingling: git, data and verification | Integration                                   |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
+| F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                            | Implemented; 19 backend checks passed, with validation/test-isolation fixes             | Independent verification pending     | Local integration passed; team review pending |
+| F2 Profile viewing/editing and profile photos                       | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile`          | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria     | Awaiting confirmation                | Pending integration                           |
+| F3 Discovery, filters and fit explanations                          | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery`        | Implemented; 40 backend checks passed (F1, F2 & F3), covering all 9 acceptance criteria | Awaiting confirmation                | Pending integration                           |
+| F4 Conversations, messages and unread indicators                    | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging`        | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
+| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`   | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
+| F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
 
 ## Assignments for the remaining features
 
-| Feature | Malak can build now | Marianna implements later | Qingling prepares and verifies |
-| --- | --- | --- | --- |
-| F2 Profiles | Profile display/editor; bio, skills, interests and goals; photo picker, preview, enlargement, edit and removal; validation and save/error states using a sample profile service. | Profile read/update operations; ownership checks; photo upload/storage and file validation; persistent skill/interest relationships. | Representative complete/empty profiles; valid/invalid photos; correct saved fields; ownership and photo-access checks after integration. |
-| F3 Discovery | Profile cards, filters, empty/loading/error states and explanations derived from sample profiles. | Filter/query operations; eligible-user rules; pagination; factual fit data without exposing private account fields. | Expected filter results, combined-filter cases, fit explanations and checks that suspended users/private fields are excluded. |
-| F4 Messaging | Conversation list; separate histories and drafts; open/reopen chats; send/retry states; unread badges and sample incoming-message alerts; mobile conversation navigation. | Persistent conversations/messages; participant-only access; duplicate-conversation prevention; unread/read state; agreed message update mechanism. | Multiple conversations and incoming-message fixtures; message order; unread clearing; isolation between chats; third-party access denial and persistence. |
-| F5 Administration | Screens for users and managed lists; create/edit/deactivate flows, confirmations, validation and failure states using sample services. | Administrator authorization; list management; duplicate rules; reference-preserving deactivation; user suspension/reactivation and session revocation. | Duplicate/inactive values; existing references; role restrictions; suspended-user behavior; changes reflected in learner screens. |
-| F6 Account settings | Editable name/course and password-change form; reauthentication prompts; success/error states using sample services. | Authenticated account updates; password verification/change; session handling; server-side validation. | Correct updates; invalid credentials; course validity; unauthorized changes and session behavior after password changes. |
+| Feature             | Malak can build now                                                                                                                                                              | Marianna implements later                                                                                                                              | Qingling prepares and verifies                                                                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F2 Profiles         | Profile display/editor; bio, skills, interests and goals; photo picker, preview, enlargement, edit and removal; validation and save/error states using a sample profile service. | Profile read/update operations; ownership checks; photo upload/storage and file validation; persistent skill/interest relationships.                   | Representative complete/empty profiles; valid/invalid photos; correct saved fields; ownership and photo-access checks after integration.                  |
+| F3 Discovery        | Profile cards, filters, empty/loading/error states and explanations derived from sample profiles.                                                                                | Filter/query operations; eligible-user rules; pagination; factual fit data without exposing private account fields.                                    | Expected filter results, combined-filter cases, fit explanations and checks that suspended users/private fields are excluded.                             |
+| F4 Messaging        | Conversation list; separate histories and drafts; open/reopen chats; send/retry states; unread badges and sample incoming-message alerts; mobile conversation navigation.        | Persistent conversations/messages; participant-only access; duplicate-conversation prevention; unread/read state; agreed message update mechanism.     | Multiple conversations and incoming-message fixtures; message order; unread clearing; isolation between chats; third-party access denial and persistence. |
+| F5 Administration   | Screens for users and managed lists; create/edit/deactivate flows, confirmations, validation and failure states using sample services.                                           | Administrator authorization; list management; duplicate rules; reference-preserving deactivation; user suspension/reactivation and session revocation. | Duplicate/inactive values; existing references; role restrictions; suspended-user behavior; changes reflected in learner screens.                         |
+| F6 Account settings | Editable name/course and password-change form; reauthentication prompts; success/error states using sample services.                                                             | Authenticated account updates; password verification/change; session handling; server-side validation.                                                 | Correct updates; invalid credentials; course validity; unauthorized changes and session behavior after password changes.                                  |
 
 Every frontend feature must support desktop, laptop and mobile, keyboard operation, relevant validation, loading, empty and error states. Keep all sample credentials/data fictional, and keep sample services replaceable by real API adapters.
 
@@ -116,11 +116,11 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ## Ownership
 
-| Team member | Strength | Responsibility |
-| --- | --- | --- |
-| Malak | Frontend | Registration and login interface, course selection, sign-out, and protected welcome page. |
-| Marianna | Backend | Account creation, authentication, sessions, available-course data endpoint, and protected access. |
-| Qingling | Data analysis and verification | Initial course data, test data, data validation, and verification of the complete feature. |
+| Team member | Strength                       | Responsibility                                                                                    |
+| ----------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Malak       | Frontend                       | Registration and login interface, course selection, sign-out, and protected welcome page.         |
+| Marianna    | Backend                        | Account creation, authentication, sessions, available-course data endpoint, and protected access. |
+| Qingling    | Data analysis and verification | Initial course data, test data, data validation, and verification of the complete feature.        |
 
 ## Malak - Frontend
 
@@ -278,7 +278,6 @@ The feature is complete when all three contributions work together and the share
 - Qingling: independent message order, isolation, retry, unread and responsive checks; persistence/security checks after integration.
 - Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
 
-
 ## F5 frontend completion - 5 October 2026
 
 - Malak: published branch feature/frontend-administration, based on F4 commit 86ca2f5. Implemented sample user management and category/skill/interest/course lists; create/rename, duplicate validation, category assignment, deactivate/reactivate, course correction, suspend/reactivate confirmations, search/status filters and save retry.
@@ -288,7 +287,6 @@ The feature is complete when all three contributions work together and the share
 - Qingling: independent admin workflow, inactive-reference, duplicate and responsive checks; verify direct API authorization, persistence and suspension across learner screens after integration.
 - Malak next: frontend review and F2-F6 integration as backend endpoints become available.
 - Handoff: [F5 administration handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-administration/frontend/ADMIN_HANDOFF.md). F5 is published to origin/feature/frontend-administration; only this tracker is updated on main. Application changes are not merged into main.
-
 
 ## F6 frontend completion - 5 October 2026
 
