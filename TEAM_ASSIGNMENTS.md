@@ -3,7 +3,7 @@
 Date: 1 October 2026  
 Last updated: 8 October 2026
 
-Related specification: [PRD.md](PRD.md), FR-01 through FR-05
+Related specification: [PRD.md](PRD.md), FR-01 through FR-06
 
 ## How we work while teammates are unavailable
 
@@ -31,7 +31,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery`   | Implemented; F1–F3 backend suite passed 40 checks                                          | Independent verification pending     | Local integration passed; team review pending                                      |
 | F4 Conversations, messages and unread indicators                    | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging`             | Implemented; F1–F4 backend suite passed 51 checks                                          | Independent verification pending     | Two-account adapter/API check passed; independent team and browser review pending   |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`                 | Implemented; 61 backend checks passed (F1 through F5), covering all 8 acceptance criteria | Awaiting confirmation                | Pending integration                                                                |
-| F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings`               | Awaiting confirmation                                                                     | Awaiting confirmation                | Pending integration                                                                |
+| F6 Account settings: name, course and password changes | **Connected locally**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | API adapter and full backend suite passed; browser walkthrough pending |
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
@@ -39,7 +39,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F3 Discovery, filters and fit explanations | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F4 Conversations, messages and unread indicators | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
 | F5 Administration: users, courses, categories, skills and interests | **Connected locally**, 8 Oct 2026; `feature/integrate-administration` | Implemented; 61 backend checks passed | Independent verification pending | Connected locally; adapter tests and backend suite passed; admin browser smoke check passed; mutation walkthrough and independent verification pending |
-| F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F6 Account settings: name, course and password changes | **Connected locally**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | API adapter and full backend suite passed; browser walkthrough pending |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
 
@@ -51,7 +51,7 @@ F6 completes the account-management portion of FR-01 beyond the initial F1 miles
 | F3 Discovery | Profile cards, filters, empty/loading/error states and explanations derived from sample profiles. | Filter/query operations; eligible-user rules; pagination; factual fit data without exposing private account fields. | Expected filter results, combined-filter cases, fit explanations and checks that suspended users/private fields are excluded. |
 | F4 Messaging | Conversation list; separate histories and drafts; open/reopen chats; send/retry states; unread badges and sample incoming-message alerts; mobile conversation navigation. | Persistent conversations/messages; participant-only access; duplicate-conversation prevention; unread/read state; agreed message update mechanism. | Multiple conversations and incoming-message fixtures; message order; unread clearing; isolation between chats; third-party access denial and persistence. |
 | F5 Administration | Connected frontend for users and managed lists; review/fix integration issues on `feature/integrate-administration`. | F5 API implemented: administrator authorization, list management, duplicate rules, reference-preserving deactivation, user suspension/reactivation and session revocation. Review the integration. | Independently verify duplicate/inactive values, existing references, role restrictions, suspended-user behavior and changes reflected in learner screens. |
-| F6 Account settings | Editable name/course and password-change form; reauthentication prompts; success/error states using sample services. | Authenticated account updates; password verification/change; session handling; server-side validation. | Correct updates; invalid credentials; course validity; unauthorized changes and session behavior after password changes. |
+| F6 Account settings | Connected editable name/course and password-change form on `feature/integrate-account-settings`; review locally and complete browser checks. | F6 API implemented: authenticated account read/update, active-course validation, current-password reauthentication, password updates and revocation of other sessions. | Independently verify name/course persistence, invalid inputs/passwords, unauthenticated access, session handling and responsive layouts. |
 
 Every frontend feature must support desktop, laptop and mobile, keyboard operation, relevant validation, loading, empty and error states. Keep all sample credentials/data fictional, and keep sample services replaceable by real API adapters.
 
@@ -146,6 +146,14 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Checks: 61 automated tests passing in [backend/test.js](backend/test.js) covering all 8 FR-05 acceptance criteria.
 - Qingling next: independently verify admin authorization, category filtering, duplicate rejection, soft deactivation, session revocation, and learner privacy.
 - Malak next: connect frontend `adminService.js` to real backend endpoints.
+
+### F6 - Connected locally on 8 October 2026
+
+- Owner: Malak (frontend integration), Marianna (backend). Frontend branch: `feature/integrate-account-settings` (local).
+- Connected [frontend/src/Settings.jsx](frontend/src/Settings.jsx) through [frontend/src/settingsApi.js](frontend/src/settingsApi.js) to authenticated `GET /api/account`, `PATCH /api/account` and `POST /api/account/password`. Successful account changes update the current user shown in the app; the course selector uses active courses. Real mode uses the backend; demo mode retains the sample service and controls.
+- Backend source and tests are from Marianna's F6 commit `3359e0e`. The integration corrects a backend error message that incorrectly called the real password a sample password.
+- Checks: frontend suite passed 24 tests; F1–F6 backend suite passed 71 checks; production build passed. Live check: frontend returned 200 and the protected account endpoint returned the expected 401 without authentication. Browser walkthrough and Qingling's independent verification remain pending.
+- Next: Malak should verify name/course updates across settings, header, profile and welcome screens, and exercise password changes with a disposable account. Qingling should independently check persistence, access control, invalid inputs and session behavior. Do not change a real account password for testing.
 
 ### Record for each subsequent completed frontend feature
 
