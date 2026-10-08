@@ -1,5 +1,11 @@
 export const profileOptions = {
-  skills: ['React', 'JavaScript', 'UI design', 'Accessibility', 'Node.js', 'Python', 'Market research', 'Marketing', 'Product strategy'],
+  skills: [
+    'React', 'JavaScript', 'UI design', 'Accessibility', 'Node.js', 'Python', 'Market research', 'Marketing', 'Product strategy',
+    'Accounting and bookkeeping', 'Budgeting and forecasting', 'Business analysis', 'Business development', 'Business planning',
+    'Content marketing', 'Customer relationship management', 'Customer service', 'Data analysis', 'Digital marketing',
+    'Entrepreneurship', 'Financial analysis', 'Human resources', 'Leadership', 'Negotiation', 'Operations management',
+    'Presentation skills', 'Project management', 'Sales', 'Strategic planning', 'Supply chain management', 'Team management',
+  ],
   interests: ['Education', 'Design', 'Sustainability', 'Technology', 'Entrepreneurship'],
   goals: ['Project collaboration', 'Co-founder partnership', 'Peer support', 'Friendship'],
 };

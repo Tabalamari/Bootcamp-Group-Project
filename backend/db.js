@@ -189,12 +189,42 @@ const seedSkill = db.prepare('INSERT OR IGNORE INTO skills (id, name, is_active)
   ['python', 'Python'],
   ['market-research', 'Market research'],
   ['marketing', 'Marketing'],
-  ['product-strategy', 'Product strategy']
+  ['product-strategy', 'Product strategy'],
+  ['accounting-bookkeeping', 'Accounting and bookkeeping'],
+  ['budgeting-forecasting', 'Budgeting and forecasting'],
+  ['business-analysis', 'Business analysis'],
+  ['business-development', 'Business development'],
+  ['business-planning', 'Business planning'],
+  ['content-marketing', 'Content marketing'],
+  ['customer-relationship-management', 'Customer relationship management'],
+  ['customer-service', 'Customer service'],
+  ['data-analysis', 'Data analysis'],
+  ['digital-marketing', 'Digital marketing'],
+  ['entrepreneurship', 'Entrepreneurship'],
+  ['financial-analysis', 'Financial analysis'],
+  ['human-resources', 'Human resources'],
+  ['leadership', 'Leadership'],
+  ['negotiation', 'Negotiation'],
+  ['operations-management', 'Operations management'],
+  ['presentation-skills', 'Presentation skills'],
+  ['project-management', 'Project management'],
+  ['sales', 'Sales'],
+  ['strategic-planning', 'Strategic planning'],
+  ['supply-chain-management', 'Supply chain management'],
+  ['team-management', 'Team management']
 ].forEach(([id, name]) => seedSkill.run(id, name));
 
 // Associate default skills with categories
 db.prepare("UPDATE skills SET category_id = 'technical' WHERE id IN ('react', 'javascript', 'ui-design', 'accessibility', 'nodejs', 'python') AND (category_id IS NULL OR category_id = '')").run();
-db.prepare("UPDATE skills SET category_id = 'business' WHERE id IN ('market-research', 'marketing', 'product-strategy') AND (category_id IS NULL OR category_id = '')").run();
+db.prepare(`UPDATE skills SET category_id = 'business'
+  WHERE id IN (
+    'market-research', 'marketing', 'product-strategy', 'accounting-bookkeeping',
+    'budgeting-forecasting', 'business-analysis', 'business-development', 'business-planning',
+    'content-marketing', 'customer-relationship-management', 'customer-service', 'data-analysis',
+    'digital-marketing', 'entrepreneurship', 'financial-analysis', 'human-resources', 'leadership',
+    'negotiation', 'operations-management', 'presentation-skills', 'project-management', 'sales',
+    'strategic-planning', 'supply-chain-management', 'team-management'
+  ) AND (category_id IS NULL OR category_id = '')`).run();
 
 // Initial interests seeding
 const seedInterest = db.prepare('INSERT OR IGNORE INTO interests (id, name, is_active) VALUES (?, ?, 1)');

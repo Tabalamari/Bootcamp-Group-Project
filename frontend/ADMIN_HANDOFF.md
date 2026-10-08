@@ -6,6 +6,8 @@ The administration frontend is connected locally on `feature/integrate-administr
 
 Administrators can search and inspect users, correct course assignments, suspend/reactivate accounts, and create/edit/deactivate/reactivate categories, skills, interests and courses. Skill and interest records can be assigned to categories. User inspection shows account/profile fields and explicitly excludes private conversations. Backend deactivation preserves existing references, and suspension revokes active sessions.
 
+The starter skill catalog now includes 22 additional business options spanning finance, planning, marketing, sales, customer service, people management, operations and analytics. They are seeded under the Business category and appear in both the profile editor and admin skill list.
+
 ## Verification status
 
 - Frontend tests: 21 passed.
