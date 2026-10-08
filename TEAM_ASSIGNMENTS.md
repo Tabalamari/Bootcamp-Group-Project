@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 5 October 2026
+Last updated: 8 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-05
 
@@ -29,7 +29,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F3 Discovery, filters and fit explanations | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F4 Conversations, messages and unread indicators | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging` | Awaiting confirmation | Awaiting confirmation | Pending integration |
+| F4 Conversations, messages and unread indicators | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 | F6 Account settings: name, course and password changes | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation | Awaiting confirmation | Pending integration |
 
@@ -233,7 +233,7 @@ The feature is complete when all three contributions work together and the share
 - Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
 - F3 is published to origin/feature/frontend-discovery. F2/F3 integration is published on feature/integrate-profiles-discovery for review.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
-- Malak next: review the connected F2/F3 flows, then integrate F4-F6 as backend endpoints become available.
+- Malak next: review connected F2/F3 and F4 messaging, then integrate F5-F6 as backend endpoints become available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
 
 - Design: restored the left sidebar on desktop/laptop and compact mobile navigation.
@@ -246,6 +246,14 @@ The feature is complete when all three contributions work together and the share
 - Marianna: persistent messaging APIs, participant authorization, unread/read state, update delivery and duplicate prevention.
 - Qingling: independent message order, isolation, retry, unread and responsive checks; persistence/security checks after integration.
 - Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
+
+## F4 backend integration - 8 October 2026
+
+- Imported Marianna's merged FR-04 backend from `origin/main` into `feature/integrate-messaging` and connected the messaging UI to the authenticated conversation, history, send, read and inbox endpoints.
+- Conversation lists and message history now persist through the API; unread counts refresh every 20 seconds and on demand. The demo-only incoming-message controls remain limited to demo mode.
+- Checks: 51 backend checks, 18 frontend tests and the production build passed. An isolated in-memory test used the actual frontend messaging adapter with two authenticated accounts to verify conversation reuse, sending, ordered history, sender labels, unread clearing and account-isolated drafts/history. A third account was denied access (403). The Vite proxy reaches the protected messaging route (401 without a token); a stale local backend initially returned 404 and was restarted from the current source.
+- Qingling: independently verify two-account conversation flow, message persistence, ordering, unread clearing and participant isolation.
+- Remaining: independent verification by Qingling and a browser walkthrough using real team accounts. The F4 connection is being committed locally on `feature/integrate-messaging`; the application branch is not pushed.
 
 
 ## F5 frontend completion - 5 October 2026

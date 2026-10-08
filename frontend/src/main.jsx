@@ -9,6 +9,7 @@ import Messages from './Messages';
 import Admin from './Admin';
 import Settings from './Settings';
 import { messageService } from './messageService';
+import { messageApi } from './messageApi';
 import { profileService } from './profileService';
 import { profileApi } from './profileApi';
 
@@ -18,14 +19,23 @@ function App() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [unread, setUnread] = useState(0);
   const [messageNotice, setMessageNotice] = useState('');
+  const messaging = isDemo ? messageService : messageApi;
   useEffect(() => {
     setSelectedChat(null); setMessageNotice(''); setUnread(0);
     if (!user) return;
-    const refresh = () => setUnread(messageService.list(user.id).reduce((total, chat) => total + chat.unread, 0));
-    refresh(); return messageService.subscribe(refresh);
+    let active = true;
+    const update = chats => { if (active) setUnread(chats.reduce((total, chat) => total + chat.unread, 0)); };
+    const refresh = async () => {
+      try { update(await messaging.list(user.id)); }
+      catch { /* The Messages page presents any API loading error. */ }
+    };
+    const unsubscribe = messaging.subscribe(() => update(isDemo ? messageService.list(user.id) : messageApi.snapshot()));
+    refresh();
+    const timer = isDemo ? null : window.setInterval(refresh, 20000);
+    return () => { active = false; unsubscribe(); if (timer) window.clearInterval(timer); };
   }, [user?.id]);
-  function startChat(personId) {
-    try { messageService.open(user.id, personId); setSelectedChat(personId); location.hash = 'messages'; }
+  async function startChat(personId) {
+    try { const id = await messaging.open(user.id, personId); setSelectedChat(id); location.hash = 'messages'; }
     catch (e) { setMessageNotice(e.message); }
   }
   const [ready, setReady] = useState(false);
@@ -101,10 +111,10 @@ function App() {
       {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span><Avatar photo={profilePhoto} name={user.displayName} /></a><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
-    {!isDemo && user && <div className="demo-banner">Account and profile connected to the backend · Messaging, administration and account settings are sample previews.</div>}
+    {!isDemo && user && <div className="demo-banner">Account, profile, discovery and private messaging are connected to the backend · Administration and account settings are sample previews.</div>}
     <div className={user ? "signed-in-layout" : "signed-out-layout"}>
-    {user && <nav className="community-nav" aria-label="Community"><span className="sidebar-label">YOUR COMMUNITY</span><a href="#welcome" aria-current={!["profile","discover","messages","admin","settings"].includes(page) ? "page" : undefined}>Welcome</a><a href="#discover" aria-current={page === "discover" ? "page" : undefined}>Discover</a><a href="#profile" aria-current={page === "profile" ? "page" : undefined}>My profile</a><a href="#messages" aria-current={page === "messages" ? "page" : undefined}>Messages {unread > 0 && <span className="unread-badge" aria-label={`${unread} unread messages`}>{unread}</span>}</a><a href="#settings" aria-current={page === "settings" ? "page" : undefined}>Account settings</a><a href="#admin" aria-current={page === "admin" ? "page" : undefined}>Admin preview</a><button className="sample-incoming" onClick={() => { const name = messageService.simulateIncoming(user.id); setMessageNotice(`Sample message from ${name}. Open Messages to read it.`); }}>Try sample incoming message</button></nav>}
-    <main className="page-wrap">{user && messageNotice && <div className="message-notice" role="status">{messageNotice} <a href="#messages" onClick={() => setSelectedChat("sample-amara")}>Open chat</a><button aria-label="Dismiss message notification" onClick={() => setMessageNotice("")}>×</button></div>}
+    {user && <nav className="community-nav" aria-label="Community"><span className="sidebar-label">YOUR COMMUNITY</span><a href="#welcome" aria-current={!["profile","discover","messages","admin","settings"].includes(page) ? "page" : undefined}>Welcome</a><a href="#discover" aria-current={page === "discover" ? "page" : undefined}>Discover</a><a href="#profile" aria-current={page === "profile" ? "page" : undefined}>My profile</a><a href="#messages" aria-current={page === "messages" ? "page" : undefined}>Messages {unread > 0 && <span className="unread-badge" aria-label={`${unread} unread messages`}>{unread}</span>}</a><a href="#settings" aria-current={page === "settings" ? "page" : undefined}>Account settings</a><a href="#admin" aria-current={page === "admin" ? "page" : undefined}>Admin preview</a>{isDemo && <button className="sample-incoming" onClick={() => { const name = messageService.simulateIncoming(user.id); setMessageNotice(`Sample message from ${name}. Open Messages to read it.`); }}>Try sample incoming message</button>}</nav>}
+    <main className="page-wrap">{user && messageNotice && <div className="message-notice" role="status">{messageNotice} {isDemo && <a href="#messages" onClick={() => setSelectedChat("sample-amara")}>Open chat</a>}<button aria-label="Dismiss message notification" onClick={() => setMessageNotice("")}>×</button></div>}
       {!ready ? <section className="form-card mx-auto max-w-lg" aria-live="polite"><h1>Getting things ready…</h1>{failure && <><p role="alert" className="error-banner">{failure}</p><button className="primary" onClick={start}>Try again</button></>}</section> : user ?
         (page === 'settings' ? <Settings key={user.id} user={user} /> : page === 'admin' ? <Admin key={user.id} /> : page === 'messages' ? <Messages key={user.id} user={user} selected={selectedChat} onSelect={setSelectedChat} /> : page === 'discover' ? <Discovery key={user.id} user={user} onMessage={startChat} /> : page === 'profile' ? <Profile key={user.id} user={user} courses={courses} onSaved={profile => { setProfilePhoto(profile.photo); setUser(u => ({ ...u, displayName: profile.displayName })); }} /> : <section className="welcome-card mx-auto max-w-3xl"><span className="eyebrow">YOU’RE PART OF THE COMMUNITY</span><h1>Welcome, {user.displayName}.</h1><p className="intro">Your next chapter starts with a connection.</p><div className="account-details"><p><span>Your course</span><strong>{courses.find(c => c.id === user.courseId)?.name || user.courseId}</strong></p><p><span>Your email</span><strong>{user.email}</strong></p></div><p className="text-[#526782]">Add your skills, interests and goals so your community can get to know you.</p>{<a className="primary profile-start" href="#profile">View your profile →</a>}{failure && <p className="error-banner" role="alert">{failure}</p>}</section>) :
         <div className="auth-layout">
