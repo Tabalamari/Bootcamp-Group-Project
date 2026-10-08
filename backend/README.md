@@ -1,4 +1,4 @@
-# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04 & FR-05)
+# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04, FR-05 & FR-06)
 
 Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
@@ -6,6 +6,7 @@ Backend implementation for Bootcamp Connect core features:
 - **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.
 - **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking).
 - **FR-05:** Administration (admin workspace data, taxonomy & category management, soft deactivation, duplicate prevention, learner course correction, session revocation upon suspension, strict privacy isolation for student chats).
+- **FR-06:** Account settings (authenticated name and course updates, password changes with reauthentication, session revocation policy, rate-limited attempts).
 
 **Owner:** Marianna  
 **Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `multer`, `bcryptjs`, Bearer Token (UUID)
@@ -37,12 +38,13 @@ Static uploads are served from `/uploads`.
 ```bash
 npm test
 ```
-The script runs 61 automated checks verifying:
+The script runs 71 automated checks verifying:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
 - All 10 FR-04 acceptance criteria (start conversation and send 1-2000 chars text, conversation deduplication, self-messaging prohibition, server-enforced 2-participant isolation, chronological order with sender/timestamp, persistent storage across sessions, inbox preview with unread count, draft preservation on validation errors, suspended account blocking for senders and recipients, manual refresh compatibility).
 - All 8 FR-05 acceptance criteria (admin role-based access control with 401/403 enforcement, workspace state hydration, taxonomy category management, duplicate validation across case/whitespace, safe deactivation without physical deletion, immediate session revocation upon suspension, learner course correction, and privacy protection excluding private messages from admin inspection).
+- All FR-06 acceptance criteria (authenticated account settings inspection, display name and active course updates, empty and length validation, current-password reauthentication, password length and non-identity rules, subsequent login with new password and old password rejection, auxiliary session revocation, and rate limiting).
 
 ---
 
@@ -472,6 +474,75 @@ All administrator endpoints require an active session belonging to a user with `
     }
     ```
   - **Soft Deactivation (Acceptance Criterion 5):** records are preserved (`is_active = 0`) to safeguard historical references and learner profile data without performing physical deletion.
+
+### FR-06: Account Settings
+
+#### 25. Get Account Settings (Protected)
+- **`GET /api/account`** (alias: `/api/account/settings`)
+  - **Header:** `Authorization: Bearer <token>`
+  - **Description:** Returns authenticated learner's account details for Malak's Account Settings view.
+  - **Response (200 OK):**
+    ```json
+    {
+      "id": "user-uuid",
+      "displayName": "Alexander Smith",
+      "email": "alex@example.com",
+      "courseId": "software-dev",
+      "courseName": "Software Development",
+      "role": "learner",
+      "status": "active"
+    }
+    ```
+
+#### 26. Update Account Settings (Protected)
+- **`PATCH /api/account`** (and `PUT /api/account`)
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "displayName": "Alexander Smith",
+      "courseId": "business-dev"
+    }
+    ```
+  - **Validation:**
+    - `displayName`: 1–80 characters trimmed.
+    - `courseId`: Must exist and have `is_active = 1`.
+  - **Response (200 OK):**
+    ```json
+    {
+      "id": "user-uuid",
+      "displayName": "Alexander Smith",
+      "email": "alex@example.com",
+      "courseId": "business-dev",
+      "courseName": "Business Development",
+      "role": "learner",
+      "message": "Account settings updated successfully"
+    }
+    ```
+
+#### 27. Change Password with Reauthentication (Protected)
+- **`POST /api/account/password`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "currentPassword": "OldPassword123!",
+      "newPassword": "NewStrongPassword456!"
+    }
+    ```
+  - **Security & Reauthentication:**
+    - Validates `currentPassword` against stored bcrypt hash (`401 Unauthorized` if incorrect).
+    - `newPassword` length must be between 8 and 128 characters.
+    - `newPassword` must differ from `currentPassword`.
+    - Revokes all other active sessions while preserving current token (`DELETE FROM sessions WHERE user_id = ? AND token != ?`).
+    - In-memory rate limiting rejects brute-force attempts after 5 failures (`429 Too Many Requests`).
+  - **Response (200 OK):**
+    ```json
+    {
+      "message": "Password updated successfully. Other active sessions have been revoked.",
+      "sessionsRevoked": true
+    }
+    ```
 
 ---
 

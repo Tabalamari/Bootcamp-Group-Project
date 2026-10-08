@@ -1,6 +1,6 @@
 /**
  * Automated test suite for Marianna's backend requirements and Qingling's criteria
- * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), FR-04 (Private Messaging), and FR-05 (Administration)
+ * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), FR-04 (Private Messaging), FR-05 (Administration), and FR-06 (Account Settings)
  * Usage: npm test
  */
 
@@ -11,7 +11,7 @@ const app = require('./server');
 const db = require('./db');
 
 async function runTests() {
-  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02, FR-03, FR-04 & FR-05) ===\n');
+  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02, FR-03, FR-04, FR-05 & FR-06) ===\n');
 
   // Start server on an ephemeral port
   const server = app.listen(0);
@@ -1204,6 +1204,221 @@ async function runTests() {
       userInspectionData.conversations === undefined &&
       userInspectionData.chats === undefined,
       'TEST 61: User inspection endpoints strictly exclude student conversations and private messages'
+    );
+
+    // =========================================================
+    // FR-06: ACCOUNT SETTINGS
+    // =========================================================
+
+    // Log in test user Alex afresh to obtain an active session token
+    const resSettingsLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: testUser.password })
+    });
+    const settingsLoginData = await resSettingsLogin.json();
+    let settingsToken = settingsLoginData.token;
+
+    // TEST 62: Retrieve account settings (GET /api/account)
+    const resGetAccount = await fetch(`${baseUrl}/account`, {
+      headers: { Authorization: `Bearer ${settingsToken}` }
+    });
+    const accountData = await resGetAccount.json();
+
+    const resGetAccountAlias = await fetch(`${baseUrl}/account/settings`, {
+      headers: { Authorization: `Bearer ${settingsToken}` }
+    });
+
+    assert(
+      resGetAccount.status === 200 &&
+      accountData.id === testUserId &&
+      accountData.email === testUser.email &&
+      accountData.courseId === 'software-dev' &&
+      resGetAccountAlias.status === 200,
+      'TEST 62: GET /api/account returns status 200 with authenticated account details'
+    );
+
+    // TEST 63: Update display name and course (PATCH /api/account)
+    const resUpdateAccount = await fetch(`${baseUrl}/account`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({
+        displayName: 'Alexander The Great',
+        courseId: 'business-dev'
+      })
+    });
+    const updatedAccountData = await resUpdateAccount.json();
+
+    assert(
+      resUpdateAccount.status === 200 &&
+      updatedAccountData.displayName === 'Alexander The Great' &&
+      updatedAccountData.courseId === 'business-dev' &&
+      updatedAccountData.courseName === 'Business Development',
+      'TEST 63: PATCH /api/account successfully updates display name and course'
+    );
+
+    // TEST 64: Public profile reflects updated display name and course
+    const resProfileCheck = await fetch(`${baseUrl}/profiles/me`, {
+      headers: { Authorization: `Bearer ${settingsToken}` }
+    });
+    const profileCheckData = await resProfileCheck.json();
+
+    assert(
+      resProfileCheck.status === 200 &&
+      profileCheckData.displayName === 'Alexander The Great' &&
+      profileCheckData.courseId === 'business-dev',
+      'TEST 64: Profile reflects updated account display name and course'
+    );
+
+    // TEST 65: Validation - reject invalid display name length (400 Bad Request)
+    const resAccountEmptyName = await fetch(`${baseUrl}/account`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({ displayName: '   ' })
+    });
+
+    const resAccountLongName = await fetch(`${baseUrl}/account`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({ displayName: 'A'.repeat(81) })
+    });
+
+    assert(
+      resAccountEmptyName.status === 400 && resAccountLongName.status === 400,
+      'TEST 65: PATCH /api/account rejects empty display name or name exceeding 80 characters (400 Bad Request)'
+    );
+
+    // TEST 66: Validation - reject non-existent or inactive course (400 Bad Request)
+    const resAccountInvalidCourse = await fetch(`${baseUrl}/account`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({ courseId: 'quantum-computing' })
+    });
+
+    assert(
+      resAccountInvalidCourse.status === 400,
+      'TEST 66: PATCH /api/account rejects non-existent or inactive course (400 Bad Request)'
+    );
+
+    // TEST 67: Password change requires correct current password (401 Unauthorized)
+    const resAccountWrongPassword = await fetch(`${baseUrl}/account/password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({
+        currentPassword: 'WrongPassword999!',
+        newPassword: 'BrandNewPassword123!'
+      })
+    });
+
+    assert(
+      resAccountWrongPassword.status === 401,
+      'TEST 67: POST /api/account/password rejects incorrect current password (401 Unauthorized)'
+    );
+
+    // TEST 68: Password change rejects short password or identical new password (400 Bad Request)
+    const resAccountShortPassword = await fetch(`${baseUrl}/account/password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({
+        currentPassword: testUser.password,
+        newPassword: 'short'
+      })
+    });
+
+    const resAccountIdenticalPassword = await fetch(`${baseUrl}/account/password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({
+        currentPassword: testUser.password,
+        newPassword: testUser.password
+      })
+    });
+
+    assert(
+      resAccountShortPassword.status === 400 && resAccountIdenticalPassword.status === 400,
+      'TEST 68: POST /api/account/password rejects short password or new password identical to current (400 Bad Request)'
+    );
+
+    // TEST 69: Successful password change (POST /api/account/password)
+    const newTestPassword = 'NewSecretPassword999!';
+    // Create an auxiliary second session to test session revocation policy
+    const resAccountSecondSession = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: testUser.password })
+    });
+    const secondSessionData = await resAccountSecondSession.json();
+    const auxiliaryToken = secondSessionData.token;
+
+    const resAccountChangePassword = await fetch(`${baseUrl}/account/password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${settingsToken}`
+      },
+      body: JSON.stringify({
+        currentPassword: testUser.password,
+        newPassword: newTestPassword
+      })
+    });
+    const changePasswordResult = await resAccountChangePassword.json();
+
+    assert(
+      resAccountChangePassword.status === 200 &&
+      changePasswordResult.sessionsRevoked === true,
+      'TEST 69: POST /api/account/password successfully changes password'
+    );
+
+    // TEST 70: New password logs in successfully, old password is rejected (401 Unauthorized)
+    const resAccountLoginOld = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: testUser.password })
+    });
+
+    const resAccountLoginNew = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: newTestPassword })
+    });
+
+    assert(
+      resAccountLoginOld.status === 401 && resAccountLoginNew.status === 200,
+      'TEST 70: Login succeeds with new password and rejects old password (401 Unauthorized)'
+    );
+
+    // TEST 71: Password change revokes other active sessions while preserving current session
+    const resAccountAuxiliaryAccess = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${auxiliaryToken}` }
+    });
+    const resAccountCurrentAccess = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${settingsToken}` }
+    });
+
+    assert(
+      resAccountAuxiliaryAccess.status === 401 && resAccountCurrentAccess.status === 200,
+      'TEST 71: Password change revokes auxiliary sessions while keeping the current token active'
     );
 
   } catch (err) {
