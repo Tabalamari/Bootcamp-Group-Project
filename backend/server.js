@@ -803,6 +803,373 @@ app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req,
   }
 });
 
+// -------------------------------------------------------------
+// Helper functions for 1-on-1 Private Messaging (FR-04)
+// -------------------------------------------------------------
+
+// Helper to canonically order two participant IDs to prevent duplicate conversations
+function canonicalizeParticipants(userA, userB) {
+  return userA < userB ? [userA, userB] : [userB, userA];
+}
+
+// Helper to retrieve public summary of a user (excluding email, password_hash, role)
+function getPublicUserSummary(userId) {
+  const row = db.prepare(`
+    SELECT 
+      users.id, 
+      users.display_name, 
+      users.status,
+      courses.name AS course_name,
+      profiles.photo_url
+    FROM users
+    JOIN courses ON users.course_id = courses.id
+    LEFT JOIN profiles ON users.id = profiles.user_id
+    WHERE users.id = ?
+  `).get(userId);
+
+  if (!row) return null;
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    courseName: row.course_name,
+    photoUrl: row.photo_url || null,
+    status: row.status
+  };
+}
+
+// Helper to get unread messages count in a conversation for a specific user
+function getUnreadCount(conversationId, userId) {
+  const readRecord = db.prepare(`
+    SELECT last_read_at FROM conversation_reads 
+    WHERE conversation_id = ? AND user_id = ?
+  `).get(conversationId, userId);
+
+  const lastReadAt = readRecord ? readRecord.last_read_at : '1970-01-01T00:00:00.000Z';
+
+  const countRow = db.prepare(`
+    SELECT COUNT(*) AS count FROM messages 
+    WHERE conversation_id = ? AND sender_id != ? AND created_at > ?
+  `).get(conversationId, userId, lastReadAt);
+
+  return countRow ? countRow.count : 0;
+}
+
+// Helper to get latest message preview in a conversation
+function getLastMessage(conversationId) {
+  const msg = db.prepare(`
+    SELECT id, conversation_id, sender_id, text, created_at 
+    FROM messages 
+    WHERE conversation_id = ? 
+    ORDER BY created_at DESC, rowid DESC 
+    LIMIT 1
+  `).get(conversationId);
+
+  if (!msg) return null;
+  return {
+    id: msg.id,
+    conversationId: msg.conversation_id,
+    senderId: msg.sender_id,
+    text: msg.text,
+    createdAt: msg.created_at
+  };
+}
+
+// Helper to format conversation with participant details, last message, and unread count
+function formatConversation(conv, currentUserId) {
+  const otherUserId = conv.participant1_id === currentUserId ? conv.participant2_id : conv.participant1_id;
+  const otherUser = getPublicUserSummary(otherUserId);
+  const lastMessage = getLastMessage(conv.id);
+  const unreadCount = getUnreadCount(conv.id, currentUserId);
+
+  return {
+    id: conv.id,
+    otherParticipant: otherUser ? {
+      id: otherUser.id,
+      displayName: otherUser.displayName,
+      courseName: otherUser.courseName,
+      photoUrl: otherUser.photoUrl
+    } : null,
+    lastMessage,
+    unreadCount,
+    updatedAt: conv.updated_at
+  };
+}
+
+// -------------------------------------------------------------
+// 13. Get Conversations List / Inbox (GET /api/conversations)
+// -------------------------------------------------------------
+app.get('/api/conversations', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const rows = db.prepare(`
+      SELECT id, participant1_id, participant2_id, created_at, updated_at
+      FROM conversations
+      WHERE participant1_id = ? OR participant2_id = ?
+      ORDER BY updated_at DESC
+    `).all(currentUserId, currentUserId);
+
+    const conversations = rows.map(conv => formatConversation(conv, currentUserId));
+
+    res.json({ conversations });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve conversations' });
+  }
+});
+
+// -------------------------------------------------------------
+// 14. Start or Reuse Conversation (POST /api/conversations)
+// -------------------------------------------------------------
+app.post('/api/conversations', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const recipientId = req.body.recipientId || req.body.personId;
+
+    if (!recipientId) {
+      return res.status(400).json({ error: 'Recipient ID is required' });
+    }
+
+    if (recipientId === currentUserId) {
+      return res.status(400).json({ error: 'Cannot start conversation with yourself' });
+    }
+
+    const recipient = db.prepare('SELECT id, status FROM users WHERE id = ?').get(recipientId);
+    if (!recipient) {
+      return res.status(404).json({ error: 'Recipient user not found' });
+    }
+
+    if (recipient.status === 'suspended') {
+      return res.status(403).json({ error: 'This recipient is suspended and cannot be contacted' });
+    }
+
+    const [p1, p2] = canonicalizeParticipants(currentUserId, recipientId);
+    let conversation = db.prepare(`
+      SELECT id, participant1_id, participant2_id, created_at, updated_at
+      FROM conversations
+      WHERE participant1_id = ? AND participant2_id = ?
+    `).get(p1, p2);
+
+    let isNew = false;
+    const now = new Date().toISOString();
+
+    if (!conversation) {
+      const convId = crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO conversations (id, participant1_id, participant2_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(convId, p1, p2, now, now);
+
+      conversation = db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(convId);
+      isNew = true;
+    }
+
+    // If an initial text message was provided in request body
+    if (req.body.text !== undefined) {
+      if (typeof req.body.text !== 'string' || !req.body.text.trim()) {
+        return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
+      }
+      const trimmed = req.body.text.trim();
+      if (trimmed.length > 2000) {
+        return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
+      }
+
+      const msgId = crypto.randomUUID();
+      const msgTime = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(msgId, conversation.id, currentUserId, trimmed, msgTime);
+
+      db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(msgTime, conversation.id);
+
+      db.prepare(`
+        INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+      `).run(conversation.id, currentUserId, msgTime, msgTime);
+
+      conversation = db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(conversation.id);
+    }
+
+    const formatted = formatConversation(conversation, currentUserId);
+    res.status(isNew ? 201 : 200).json({ conversation: formatted });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to start or retrieve conversation' });
+  }
+});
+
+// -------------------------------------------------------------
+// 15. Get Single Conversation Detail (GET /api/conversations/:id)
+// -------------------------------------------------------------
+app.get('/api/conversations/:id', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+      return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+
+    const formatted = formatConversation(conversation, currentUserId);
+    res.json({ conversation: formatted });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve conversation' });
+  }
+});
+
+// -------------------------------------------------------------
+// 16. Get Messages History (GET /api/conversations/:id/messages)
+// -------------------------------------------------------------
+app.get('/api/conversations/:id/messages', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Server-enforced participant authorization check
+    if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+      return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
+
+    const rows = db.prepare(`
+      SELECT id, conversation_id, sender_id, text, created_at
+      FROM messages
+      WHERE conversation_id = ?
+      ORDER BY created_at ASC, rowid ASC
+      LIMIT ?
+    `).all(conversation.id, limit);
+
+    const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
+    const otherUser = getPublicUserSummary(otherUserId);
+
+    res.json({
+      conversationId: conversation.id,
+      otherParticipant: otherUser ? {
+        id: otherUser.id,
+        displayName: otherUser.displayName,
+        courseName: otherUser.courseName,
+        photoUrl: otherUser.photoUrl
+      } : null,
+      messages: rows.map(m => ({
+        id: m.id,
+        conversationId: m.conversation_id,
+        senderId: m.sender_id,
+        text: m.text,
+        createdAt: m.created_at
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve messages' });
+  }
+});
+
+// -------------------------------------------------------------
+// 17. Send Message in Conversation (POST /api/conversations/:id/messages)
+// -------------------------------------------------------------
+app.post('/api/conversations/:id/messages', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Server-enforced participant authorization check
+    if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+      return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+
+    // Check if recipient is suspended
+    const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
+    const recipient = db.prepare('SELECT id, status FROM users WHERE id = ?').get(otherUserId);
+
+    if (recipient && recipient.status === 'suspended') {
+      return res.status(403).json({ error: 'Recipient account is suspended and cannot receive messages' });
+    }
+
+    // Validate message text length (1 to 2000 chars)
+    if (!req.body || typeof req.body.text !== 'string') {
+      return res.status(400).json({ error: 'Message text is required' });
+    }
+
+    const trimmed = req.body.text.trim();
+    if (trimmed.length < 1 || trimmed.length > 2000) {
+      return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
+    }
+
+    const msgId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(msgId, conversation.id, currentUserId, trimmed, now);
+
+    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversation.id);
+
+    // Update sender's read timestamp so their own message is not counted as unread
+    db.prepare(`
+      INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+    `).run(conversation.id, currentUserId, now, now);
+
+    res.status(201).json({
+      id: msgId,
+      conversationId: conversation.id,
+      senderId: currentUserId,
+      text: trimmed,
+      createdAt: now
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// -------------------------------------------------------------
+// 18. Mark Conversation as Read (POST /api/conversations/:id/read)
+// -------------------------------------------------------------
+app.post('/api/conversations/:id/read', authMiddleware, (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Server-enforced participant authorization check
+    if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+      return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+    `).run(conversation.id, currentUserId, now, now);
+
+    res.json({
+      success: true,
+      conversationId: conversation.id,
+      unreadCount: 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to mark conversation as read' });
+  }
+});
+
 // Start the server if file is executed directly
 if (require.main === module) {
   app.listen(PORT, () => {

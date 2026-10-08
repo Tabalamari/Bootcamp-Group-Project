@@ -1,9 +1,10 @@
-# Backend: Bootcamp Connect (FR-01, FR-02 & FR-03)
+# Backend: Bootcamp Connect (FR-01, FR-02, FR-03 & FR-04)
 
 Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
 - **FR-02:** User profiles, options vocabulary, profile viewing/editing, photo uploads/removal, and community profiles.
 - **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.
+- **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking).
 
 **Owner:** Marianna  
 **Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `multer`, `bcryptjs`, Bearer Token (UUID)
@@ -31,10 +32,11 @@ The database `database.sqlite` is created automatically with all tables and seed
 ```bash
 npm test
 ```
-The script runs 40 automated checks verifying:
+The script runs 51 automated checks verifying:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
+- All 10 FR-04 acceptance criteria (start conversation and send 1-2000 chars text, conversation deduplication, self-messaging prohibition, server-enforced 2-participant isolation, chronological order with sender/timestamp, persistent storage across sessions, inbox preview with unread count, draft preservation on validation errors, suspended account blocking for senders and recipients, manual refresh compatibility).
 
 ---
 
@@ -244,6 +246,99 @@ Base URL: `http://localhost:3000/api`
 
 ---
 
+### FR-04: Private Messaging
+
+#### 13. Inbox / Conversations List (Protected)
+- **`GET /api/conversations`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Success (200 OK):** returns conversations involving the user, with other participant summary, last message preview, unread count, sorted by latest activity descending.
+    ```json
+    {
+      "conversations": [
+        {
+          "id": "conv-uuid",
+          "otherParticipant": {
+            "id": "u-2",
+            "displayName": "Amara Lewis",
+            "courseName": "Business Development",
+            "photoUrl": "/uploads/..."
+          },
+          "lastMessage": {
+            "id": "msg-uuid",
+            "senderId": "u-2",
+            "text": "Hi! Excited to connect.",
+            "createdAt": "2026-10-07T14:30:00.000Z"
+          },
+          "unreadCount": 1,
+          "updatedAt": "2026-10-07T14:30:00.000Z"
+        }
+      ]
+    }
+    ```
+
+#### 14. Start or Reuse Conversation (Protected)
+- **`POST /api/conversations`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "recipientId": "u-2",
+      "text": "Hello Amara, let's collaborate!"
+    }
+    ```
+  - **Success (201 Created / 200 OK):** creates or reuses the conversation (deduplication). If `text` is provided, the message is sent. Self-messaging returns `400 Bad Request`. Suspended accounts return `403 Forbidden`.
+
+#### 15. Message History (Protected)
+- **`GET /api/conversations/:id/messages`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Success (200 OK):** returns chronological message history.
+    ```json
+    {
+      "conversationId": "conv-uuid",
+      "otherParticipant": {
+        "id": "u-2",
+        "displayName": "Amara Lewis",
+        "courseName": "Business Development",
+        "photoUrl": "/uploads/..."
+      },
+      "messages": [
+        {
+          "id": "msg-uuid",
+          "conversationId": "conv-uuid",
+          "senderId": "u-1",
+          "text": "Hello Amara, let's collaborate!",
+          "createdAt": "2026-10-07T14:30:00.000Z"
+        }
+      ]
+    }
+    ```
+  - **Security Guarantee:** Server-enforced 2-participant isolation. Non-participants receive `403 Forbidden`.
+
+#### 16. Send Message (Protected)
+- **`POST /api/conversations/:id/messages`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "text": "Sounds great!"
+    }
+    ```
+  - **Success (201 Created):** returns the created message object. Rejects empty messages and text > 2000 characters with `400 Bad Request`. Suspended accounts return `403 Forbidden`.
+
+#### 17. Mark Conversation as Read (Protected)
+- **`POST /api/conversations/:id/read`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Success (200 OK):**
+    ```json
+    {
+      "success": true,
+      "conversationId": "conv-uuid",
+      "unreadCount": 0
+    }
+    ```
+
+---
+
 ## 🗄 SQLite Database Schema
 
 The `database.sqlite` file is created and migrated automatically:
@@ -258,3 +353,6 @@ The `database.sqlite` file is created and migrated automatically:
 8. **`profile_skills`**: `(user_id, skill_id)` (PK, FKs).
 9. **`profile_interests`**: `(user_id, interest_id)` (PK, FKs).
 10. **`profile_goals`**: `(user_id, goal_id)` (PK, FKs).
+11. **`conversations`**: `id` (TEXT, PK), `participant1_id` (TEXT, FK), `participant2_id` (TEXT, FK), `created_at` (DATETIME), `updated_at` (DATETIME), `UNIQUE(participant1_id, participant2_id)`.
+12. **`messages`**: `id` (TEXT, PK), `conversation_id` (TEXT, FK), `sender_id` (TEXT, FK), `text` (TEXT), `created_at` (DATETIME).
+13. **`conversation_reads`**: `(conversation_id, user_id)` (PK, FKs), `last_read_at` (DATETIME).

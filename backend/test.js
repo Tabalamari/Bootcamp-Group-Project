@@ -1,6 +1,6 @@
 /**
  * Automated test suite for Marianna's backend requirements and Qingling's criteria
- * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), and FR-03 (Search & Explainable Fit)
+ * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), and FR-04 (Private Messaging)
  * Usage: npm test
  */
 
@@ -11,7 +11,7 @@ const app = require('./server');
 const db = require('./db');
 
 async function runTests() {
-  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02 & FR-03) ===\n');
+  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02, FR-03 & FR-04) ===\n');
 
   // Start server on an ephemeral port
   const server = app.listen(0);
@@ -672,6 +672,255 @@ async function runTests() {
     assert(
       allCardsOmitPrivateFields,
       'TEST 40: Discovery profiles strictly exclude email, password_hash, role, and private account fields'
+    );
+
+    // =========================================================
+    // FR-04: PRIVATE MESSAGING
+    // =========================================================
+
+    // TEST 41: Start conversation and send non-empty text message (Acceptance Criterion 1)
+    const resStartConv = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        recipientId: amaraData.user.id,
+        text: 'Hello Amara, excited to collaborate on a bootcamp project!'
+      })
+    });
+    const convData1 = await resStartConv.json();
+    assert(
+      resStartConv.status === 201 &&
+      convData1.conversation &&
+      convData1.conversation.id &&
+      convData1.conversation.otherParticipant.id === amaraData.user.id &&
+      convData1.conversation.lastMessage &&
+      convData1.conversation.lastMessage.text === 'Hello Amara, excited to collaborate on a bootcamp project!' &&
+      convData1.conversation.lastMessage.senderId === testUserId,
+      'TEST 41: A user can start a conversation with another active user and send a non-empty text message (201 Created)'
+    );
+
+    const testConvId = convData1.conversation.id;
+
+    // TEST 42: Deduplication - Starting a conversation with the same person reuses existing conversation (Acceptance Criterion 2)
+    // Amara opens conversation with testUser
+    const resReuseConv = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${amaraData.token}`
+      },
+      body: JSON.stringify({
+        recipientId: testUserId
+      })
+    });
+    const convData2 = await resReuseConv.json();
+    assert(
+      resReuseConv.status === 200 &&
+      convData2.conversation &&
+      convData2.conversation.id === testConvId &&
+      convData2.conversation.otherParticipant.id === testUserId,
+      'TEST 42: Starting a conversation with the same person reuses the existing conversation (Deduplication)'
+    );
+
+    // TEST 43: Users cannot start a conversation with themselves (Acceptance Criterion 3)
+    const resSelfConv = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        recipientId: testUserId
+      })
+    });
+    assert(
+      resSelfConv.status === 400,
+      'TEST 43: Users cannot start a conversation with themselves (400 Bad Request)'
+    );
+
+    // TEST 44: Server-enforced 2-participant isolation (Acceptance Criterion 4)
+    // Daniel (third party) tries to access or send to conversation between testUser and Amara
+    const resThirdPartyRead = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      headers: { Authorization: `Bearer ${danielData.token}` }
+    });
+    const resThirdPartySend = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${danielData.token}`
+      },
+      body: JSON.stringify({ text: 'Intruding into private chat!' })
+    });
+    const resThirdPartyMarkRead = await fetch(`${baseUrl}/conversations/${testConvId}/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${danielData.token}` }
+    });
+    assert(
+      resThirdPartyRead.status === 403 &&
+      resThirdPartySend.status === 403 &&
+      resThirdPartyMarkRead.status === 403,
+      'TEST 44: Only the two participants can read, send messages, or update read state; enforced on the server (403 Forbidden)'
+    );
+
+    // TEST 45: Messages show sender and timestamp and appear in chronological order (Acceptance Criterion 5)
+    // Amara sends a reply
+    const resAmaraReply = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${amaraData.token}`
+      },
+      body: JSON.stringify({ text: 'Hi Alex! I would love to discuss ideas.' })
+    });
+
+    // Alex sends a follow-up
+    const resAlexFollowup = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ text: 'Great! Let us connect later today.' })
+    });
+
+    // Fetch conversation message history as Alex
+    const resHistory = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const historyData = await resHistory.json();
+    const isChronological =
+      historyData.messages.length === 3 &&
+      new Date(historyData.messages[0].createdAt).getTime() <= new Date(historyData.messages[1].createdAt).getTime() &&
+      new Date(historyData.messages[1].createdAt).getTime() <= new Date(historyData.messages[2].createdAt).getTime();
+
+    assert(
+      resHistory.status === 200 &&
+      isChronological &&
+      historyData.messages[0].senderId === testUserId &&
+      historyData.messages[1].senderId === amaraData.user.id &&
+      historyData.messages[2].senderId === testUserId &&
+      historyData.messages.every(m => m.id && m.text && m.createdAt),
+      'TEST 45: Messages show sender and timestamp and appear in chronological order'
+    );
+
+    // TEST 46: Sent messages remain available after a new session / persistence in SQLite (Acceptance Criterion 6)
+    // Log in again as testUser to simulate a new session
+    const resNewLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: testUser.password })
+    });
+    const newLoginData = await resNewLogin.json();
+    const resPersistedHistory = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      headers: { Authorization: `Bearer ${newLoginData.token}` }
+    });
+    const persistedData = await resPersistedHistory.json();
+    assert(
+      resPersistedHistory.status === 200 &&
+      persistedData.messages.length === 3 &&
+      persistedData.messages[2].text === 'Great! Let us connect later today.',
+      'TEST 46: Sent messages persist in database and remain accessible in new user sessions'
+    );
+
+    // TEST 47: The inbox lists conversations and their latest message preview with unread count (Acceptance Criterion 7)
+    // Check inbox for Amara (Alex sent the last message, so Amara should have 1 unread message)
+    const resAmaraInbox = await fetch(`${baseUrl}/conversations`, {
+      headers: { Authorization: `Bearer ${amaraData.token}` }
+    });
+    const amaraInboxData = await resAmaraInbox.json();
+    const amaraConv = amaraInboxData.conversations.find(c => c.id === testConvId);
+    assert(
+      resAmaraInbox.status === 200 &&
+      amaraConv &&
+      amaraConv.otherParticipant.id === testUserId &&
+      amaraConv.lastMessage.text === 'Great! Let us connect later today.' &&
+      amaraConv.unreadCount === 1,
+      'TEST 47: The inbox lists conversations, latest message preview, and unread count'
+    );
+
+    // TEST 48: Read endpoint clears unread count (Mark Read)
+    const resMarkRead = await fetch(`${baseUrl}/conversations/${testConvId}/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${amaraData.token}` }
+    });
+    const markReadData = await resMarkRead.json();
+    const resAmaraInboxAfterRead = await fetch(`${baseUrl}/conversations`, {
+      headers: { Authorization: `Bearer ${amaraData.token}` }
+    });
+    const amaraInboxAfterReadData = await resAmaraInboxAfterRead.json();
+    const amaraConvAfterRead = amaraInboxAfterReadData.conversations.find(c => c.id === testConvId);
+    assert(
+      resMarkRead.status === 200 &&
+      markReadData.unreadCount === 0 &&
+      amaraConvAfterRead.unreadCount === 0,
+      'TEST 48: POST /api/conversations/:id/read clears the unread count for that conversation'
+    );
+
+    // TEST 49: Failed sends produce clear feedback and reject invalid input (Acceptance Criterion 8)
+    const resBlankSend = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ text: '   ' })
+    });
+    const oversizedText = 'a'.repeat(2001);
+    const resOversizedSend = await fetch(`${baseUrl}/conversations/${testConvId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ text: oversizedText })
+    });
+    assert(
+      resBlankSend.status === 400 &&
+      resOversizedSend.status === 400,
+      'TEST 49: Failed sends produce clear feedback and reject empty text or text > 2000 chars (400 Bad Request)'
+    );
+
+    // TEST 50: A suspended account cannot send messages or be contacted (Acceptance Criterion 9)
+    // 1. Try to start conversation with suspended account
+    const resContactSuspended = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ recipientId: suspData.user.id })
+    });
+
+    // 2. Try to send message as suspended user
+    const resSuspendedSend = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${suspData.token}`
+      },
+      body: JSON.stringify({ recipientId: testUserId, text: 'Hello from suspended user' })
+    });
+
+    assert(
+      resContactSuspended.status === 403 &&
+      resSuspendedSend.status === 403,
+      'TEST 50: A suspended account cannot send messages or be contacted (403 Forbidden)'
+    );
+
+    // TEST 51: Privacy constraint - Conversation participant objects strictly exclude private account fields
+    const recipientSummary = convData1.conversation.otherParticipant;
+    assert(
+      recipientSummary &&
+      recipientSummary.displayName &&
+      recipientSummary.email === undefined &&
+      recipientSummary.password_hash === undefined &&
+      recipientSummary.password === undefined &&
+      recipientSummary.role === undefined &&
+      recipientSummary.status === undefined,
+      'TEST 51: Conversation participant summaries strictly exclude email, password_hash, role, and private fields'
     );
 
   } catch (err) {
