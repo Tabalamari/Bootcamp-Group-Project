@@ -31,8 +31,8 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F2 Profile viewing/editing and profile photos | **Merged to main**, 8 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F3 Discovery, filters and fit explanations | **Merged to main**, 8 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F4 Conversations, messages and unread indicators | **Merged to main**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
-| F5 Administration: users, courses, categories, skills and interests | **Merged to main**, 8 Oct 2026; `feature/integrate-administration` | Implemented; F1–F5 backend suite passed 61 checks | Independent verification pending | Backend suite and admin browser smoke passed; mutation walkthrough and independent verification pending |
-| F6 Account settings: name, course and password changes | **Merged to main**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | Frontend suite (24), backend suite (71) and production build passed; settings browser walkthrough pending |
+| F5 Administration: users, courses, categories, skills and interests | **Merged to main**, 8 Oct 2026; `feature/integrate-administration` | Implemented; F1–F5 backend suite passed 61 checks | Independent verification pending | Backend checks and admin browser walkthrough passed; Qingling's independent verification pending |
+| F6 Account settings: name, course and password changes | **Merged to main**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | Frontend suite (24), backend suite (71), production build and Malak's browser walkthrough passed; Qingling's independent verification pending |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. The completed feature branches are now on `main`; Qingling's independent verification remains pending.
 
@@ -139,14 +139,14 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Checks: 61 automated tests passing in [backend/test.js](backend/test.js) covering all 8 FR-05 acceptance criteria.
 - Expanded the seeded Business skill catalog with 22 practical skills spanning finance, planning, marketing, sales, customer service, people management, operations and analytics.
 - Qingling next: independently verify admin authorization, category filtering, duplicate rejection, soft deactivation, session revocation, and learner privacy.
-- Malak next: complete the admin mutation walkthrough on `main` for create, edit, deactivate/reactivate and user course/status changes.
+- Malak confirmed the administration workflows work well in the browser; Qingling's independent verification remains pending.
 
 ### F6 - Connected locally on 8 October 2026
 
 - Owner: Malak (frontend integration), Marianna (backend). Frontend branch: `feature/integrate-account-settings` (merged to `main`).
 - Connected [frontend/src/Settings.jsx](frontend/src/Settings.jsx) through [frontend/src/settingsApi.js](frontend/src/settingsApi.js) to authenticated `GET /api/account`, `PATCH /api/account` and `POST /api/account/password`. Successful account changes update the current user shown in the app; the course selector uses active courses. Real mode uses the backend; demo mode retains the sample service and controls.
 - Backend source and tests are from Marianna's F6 commit `3359e0e`. The integration corrects a backend error message that incorrectly called the real password a sample password.
-- Checks: frontend suite passed 24 tests; F1–F6 backend suite passed 71 checks; production build passed. Live check: frontend returned 200 and the protected account endpoint returned the expected 401 without authentication. Browser walkthrough and Qingling's independent verification remain pending.
+- Checks: frontend suite passed 24 tests; F1–F6 backend suite passed 71 checks; production build passed. Live check: frontend returned 200 and the protected account endpoint returned the expected 401 without authentication. Malak confirmed the account settings workflow works well in the browser; Qingling's independent verification remains pending.
 - Next: Malak should verify name/course updates across settings, header, profile and welcome screens, and exercise password changes with a disposable account. Qingling should independently check persistence, access control, invalid inputs and session behavior. Do not change a real account password for testing.
 
 ### Record for each subsequent completed frontend feature
