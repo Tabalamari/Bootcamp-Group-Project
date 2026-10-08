@@ -29,7 +29,7 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                            | Implemented; 19 backend checks passed, with validation/test-isolation fixes             | Independent verification pending     | Local integration passed; team review pending |
 | F2 Profile viewing/editing and profile photos                       | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F4 Conversations, messages and unread indicators                    | **In progress**, 8 Oct 2026; `feature/integrate-messaging` (API adapter connected; authenticated chat flow pending) | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Proxy/API check passed; end-to-end verification pending |
+| F4 Conversations, messages and unread indicators                    | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`   | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
 | F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
 
@@ -231,7 +231,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification and merge approval remain open. F4 frontend/API connection work is in progress on `feature/integrate-messaging`; its authenticated two-account flow remains to be verified. Application changes have not been merged into main.
+F1 local integration checks pass. Independent team verification and merge approval remain open. F4's authenticated two-account adapter/API test has passed on `feature/integrate-messaging`; a browser walkthrough with team accounts and independent review remain pending. Application changes have not been merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -286,10 +286,10 @@ The feature is complete when all three contributions work together and the share
 ## F4 backend integration - 8 October 2026
 
 - Connected the inbox, conversation history, send, read state, inbox refresh and unread badge to Marianna's authenticated messaging APIs on `feature/integrate-messaging`.
-- Checks: 51 backend checks, 18 frontend tests and the production build passed. The Vite proxy returns 200 for courses and 401 for the protected messaging route without a token, confirming the F4 route is reachable.
+- Checks: 51 backend checks, 18 frontend tests and the production build passed. An isolated in-memory test used the actual frontend adapter with two authenticated accounts to verify conversation reuse, sending, ordered history, sender labels, unread clearing and account-isolated drafts/history; a third account was denied access (403). The Vite proxy returns 200 for courses and 401 for messaging without a token.
 - A stale local backend initially returned 404 for messaging; it was restarted from the current F4-enabled source.
 - Qingling: independently verify authenticated two-account conversations, message order and persistence, unread clearing and participant isolation.
-- Remaining: verify the authenticated end-to-end chat flow. F4 integration changes remain local and have not been committed or pushed.
+- Remaining: Qingling's independent verification and a browser walkthrough with team accounts. F4 application changes are committed locally on `feature/integrate-messaging` and have not been pushed.
 
 ## F5 frontend completion - 5 October 2026
 
