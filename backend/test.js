@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+process.env.DATABASE_PATH = ':memory:';
 const app = require('./server');
 const db = require('./db');
 
@@ -173,9 +174,10 @@ async function runTests() {
     assert(
       resOptions.status === 200 &&
       Array.isArray(optionsData.skills) && optionsData.skills.length >= 5 &&
+      ['Accounting and bookkeeping', 'Business analysis', 'Digital marketing', 'Financial analysis', 'Human resources', 'Operations management', 'Sales'].every(skill => optionsData.skills.includes(skill)) &&
       Array.isArray(optionsData.interests) && optionsData.interests.length >= 3 &&
       Array.isArray(optionsData.goals) && optionsData.goals.length >= 2,
-      'TEST 11: GET /api/profile-options returns active skills, interests, and connection goals'
+      'TEST 11: GET /api/profile-options returns active technical and business skills, interests, and connection goals'
     );
 
     // TEST 12: Initial profile state (Acceptance Criteria 1 & 5)

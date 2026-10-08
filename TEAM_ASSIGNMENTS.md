@@ -19,29 +19,22 @@ Use these status labels:
 - **Awaiting confirmation:** another team member's progress has not been reported; do not assume they have done no work.
 - **Pending integration:** real frontend/backend connection and checks remain outstanding.
 - **Done (integrated):** real backend behavior and independent verification have passed.
+- **Merged to main:** feature implementation is on `main`; any explicitly pending independent or browser verification is still open.
 
 Keep each feature on a separate branch. If the preceding branch has not merged, a new frontend branch can start from it; record that dependency and target the preceding branch for review until it merges. Publishing branches and merging to `main` are separate actions and require Malak's agreement. Do not merge merely to start the next feature.
 
 ## Feature status
 
-| Feature                                                             | Malak: frontend                                                                       | Marianna: backend                                                                         | Qingling: git, data and verification | Integration                                                                        |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
-| F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                                          | Implemented; 19 backend checks passed, with validation/test-isolation fixes               | Independent verification pending     | Local integration passed; team review pending                                      |
-| F2 Profile viewing/editing and profile photos                       | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery`   | Implemented; F1–F3 backend suite passed 40 checks                                          | Independent verification pending     | Local integration passed; team review pending                                      |
-| F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery`   | Implemented; F1–F3 backend suite passed 40 checks                                          | Independent verification pending     | Local integration passed; team review pending                                      |
-| F4 Conversations, messages and unread indicators                    | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging`             | Implemented; F1–F4 backend suite passed 51 checks                                          | Independent verification pending     | Two-account adapter/API check passed; independent team and browser review pending   |
-| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`                 | Implemented; 61 backend checks passed (F1 through F5), covering all 8 acceptance criteria | Awaiting confirmation                | Pending integration                                                                |
-| F6 Account settings: name, course and password changes | **Connected locally**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | API adapter and full backend suite passed; browser walkthrough pending |
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
-| F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
-| F2 Profile viewing/editing and profile photos | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F3 Discovery, filters and fit explanations | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
-| F4 Conversations, messages and unread indicators | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
-| F5 Administration: users, courses, categories, skills and interests | **Connected locally**, 8 Oct 2026; `feature/integrate-administration` | Implemented; 61 backend checks passed | Independent verification pending | Connected locally; adapter tests and backend suite passed; admin browser smoke check passed; mutation walkthrough and independent verification pending |
-| F6 Account settings: name, course and password changes | **Connected locally**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | API adapter and full backend suite passed; browser walkthrough pending |
+| F1 Registration, login, course selection and logout | **Merged to main**, 8 Oct 2026; `feature/frontend-auth` | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
+| F2 Profile viewing/editing and profile photos | **Merged to main**, 8 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F3 Discovery, filters and fit explanations | **Merged to main**, 8 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F4 Conversations, messages and unread indicators | **Merged to main**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
+| F5 Administration: users, courses, categories, skills and interests | **Merged to main**, 8 Oct 2026; `feature/integrate-administration` | Implemented; F1–F5 backend suite passed 61 checks | Independent verification pending | Backend suite and admin browser smoke passed; mutation walkthrough and independent verification pending |
+| F6 Account settings: name, course and password changes | **Merged to main**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | Frontend suite (24), backend suite (71) and production build passed; settings browser walkthrough pending |
 
-F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. F1 backend implementation and local integration are verified below; independent verification remains pending.
+F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. The completed feature branches are now on `main`; Qingling's independent verification remains pending.
 
 ## Assignments for the remaining features
 
@@ -144,12 +137,13 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
     - `PATCH /api/admin/:kind/:id`: updates name, category association, and soft deactivation/activation (`is_active: 0/1`) without physical deletion to preserve historical references.
   - Role-based authorization: `adminMiddleware` strictly gates all `/api/admin/*` endpoints (`401 Unauthorized` for unauthenticated, `403 Forbidden` for learners).
 - Checks: 61 automated tests passing in [backend/test.js](backend/test.js) covering all 8 FR-05 acceptance criteria.
+- Expanded the seeded Business skill catalog with 22 practical skills spanning finance, planning, marketing, sales, customer service, people management, operations and analytics.
 - Qingling next: independently verify admin authorization, category filtering, duplicate rejection, soft deactivation, session revocation, and learner privacy.
-- Malak next: connect frontend `adminService.js` to real backend endpoints.
+- Malak next: complete the admin mutation walkthrough on `main` for create, edit, deactivate/reactivate and user course/status changes.
 
 ### F6 - Connected locally on 8 October 2026
 
-- Owner: Malak (frontend integration), Marianna (backend). Frontend branch: `feature/integrate-account-settings` (local).
+- Owner: Malak (frontend integration), Marianna (backend). Frontend branch: `feature/integrate-account-settings` (merged to `main`).
 - Connected [frontend/src/Settings.jsx](frontend/src/Settings.jsx) through [frontend/src/settingsApi.js](frontend/src/settingsApi.js) to authenticated `GET /api/account`, `PATCH /api/account` and `POST /api/account/password`. Successful account changes update the current user shown in the app; the course selector uses active courses. Real mode uses the backend; demo mode retains the sample service and controls.
 - Backend source and tests are from Marianna's F6 commit `3359e0e`. The integration corrects a backend error message that incorrectly called the real password a sample password.
 - Checks: frontend suite passed 24 tests; F1–F6 backend suite passed 71 checks; production build passed. Live check: frontend returned 200 and the protected account endpoint returned the expected 401 without authentication. Browser walkthrough and Qingling's independent verification remain pending.
@@ -177,13 +171,9 @@ This is the team's first implementation milestone. The remaining account-managem
 
 ### Current status
 
-Frontend demo implemented on `feature/frontend-auth` in [frontend/](frontend/). Uses React, JavaScript, Vite and Tailwind CSS with the approved blue design and responsive desktop, laptop and mobile layouts.
+The React, JavaScript, Vite and Tailwind frontend for F1–F6 and Marianna's corresponding backend features are integrated on `main`. The application supports responsive desktop, laptop and mobile layouts. The backend suite passed 71 checks, the frontend suite passed 24 tests, and the production build passed after the combined merge.
 
-Registration, course selection, login, a welcome screen and logout are available using temporary sample accounts. Accounts and sessions reset on a page reload. This is frontend demonstration behavior, not real authentication or persistent storage.
-
-Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
-
-Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is completed with sample data; F6 account settings is completed with sample data. Next: frontend review, backend integration and independent verification. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
+Remaining work: Qingling's independent verification is pending. Malak still needs the F5 admin mutation walkthrough and the F6 account-settings browser walkthrough; the tracker records these checks. Setup instructions are in [frontend/README.md](frontend/README.md) and [frontend/INTEGRATION.md](frontend/INTEGRATION.md).
 
 ### Tasks
 
@@ -203,7 +193,7 @@ Next: F1 is connected locally, F2 is completed with sample data, and F3 is compl
 - [x] A signed-in demo user reaches the welcome page; signed-out users are gated in the interface.
 - [x] Signing out returns the user to a public screen in demo mode.
 - [x] Real API error responses and session behavior are verified locally after integration.
-- [x] The F1 authentication interface works with the real backend; F2 remains a demo.
+- [x] F1 authentication and F2–F6 are connected to the backend on `main`.
 
 ## Marianna - Backend
 
@@ -211,7 +201,7 @@ Next: F1 is connected locally, F2 is completed with sample data, and F3 is compl
 
 Marianna's F1 backend is now on `origin/main`. Its [API README](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/main/backend/README.md) was reviewed on 5 October 2026. It documents Node.js/Express, SQLite, bcrypt and bearer-token sessions. This differs from the earlier PostgreSQL plan and cookie-based frontend proposal; confirm the database choice with the team.
 
-Completed integration: use returned tokens in `Authorization: Bearer ...`, restore sessions through `GET /api/auth/me`, read errors from `error`, use course IDs from the API (`software-dev`, `business-dev`), and handle the logout JSON response. The frontend adapter now uses this API and real authentication is the default. F2 remains a labelled profile demo until profile endpoints exist.
+Completed integration: F1–F6 backend APIs are implemented and merged to `main`. The frontend uses bearer-token authentication, protected account/profile/discovery/messaging/administration/settings APIs, and server-backed courses. The full backend test suite passed 71 checks; see [backend/README.md](backend/README.md) for the API contract.
 
 Qingling should run and independently review the backend checks, then verify the integrated browser journey, persistence and direct unauthorized requests. Backend execution passed 19 checks; seven frontend tests and the real browser authentication journey passed. This is local integration verification, not a full production security audit.
 
@@ -240,7 +230,7 @@ Qingling should run and independently review the backend checks, then verify the
 
 ### Next handoff
 
-F1 is now connected locally. Use [the integration handoff](frontend/INTEGRATION.md) to run both services and independently verify real registration, courses, persistence, duplicate handling, session restoration and revoked tokens. F2 remains a separate demo. Record results; automated checks do not imply Qingling has completed her assignment.
+F1–F6 are connected and merged to `main`. Use [the integration handoff](frontend/INTEGRATION.md) to run both services and independently verify registration, profile persistence, discovery, messaging, administration, account settings and authorization. Record results; automated checks do not imply Qingling has completed her assignment.
 
 ### Tasks
 

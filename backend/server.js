@@ -1831,7 +1831,7 @@ app.post('/api/account/password', authMiddleware, (req, res) => {
       const currentAttempts = passwordAttemptLimiter.get(userId) || { count: 0, firstAttemptTime: now };
       currentAttempts.count += 1;
       passwordAttemptLimiter.set(userId, currentAttempts);
-      return res.status(401).json({ error: 'The current sample password is incorrect.' });
+      return res.status(401).json({ error: 'The current password is incorrect.' });
     }
 
     // Validate new password rules
