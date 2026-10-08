@@ -24,6 +24,14 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 
 ## Feature status
 
+| Feature                                                             | Malak: frontend                                                                       | Marianna: backend                                                                         | Qingling: git, data and verification | Integration                                                                        |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
+| F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                                          | Implemented; 19 backend checks passed, with validation/test-isolation fixes               | Independent verification pending     | Local integration passed; team review pending                                      |
+| F2 Profile viewing/editing and profile photos                       | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery`   | Implemented; F1–F3 backend suite passed 40 checks                                          | Independent verification pending     | Local integration passed; team review pending                                      |
+| F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery`   | Implemented; F1–F3 backend suite passed 40 checks                                          | Independent verification pending     | Local integration passed; team review pending                                      |
+| F4 Conversations, messages and unread indicators                    | **Connected and locally tested**, 8 Oct 2026; `feature/integrate-messaging`             | Implemented; F1–F4 backend suite passed 51 checks                                          | Independent verification pending     | Two-account adapter/API check passed; independent team and browser review pending   |
+| F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`                 | Implemented; 61 backend checks passed (F1 through F5), covering all 8 acceptance criteria | Awaiting confirmation                | Pending integration                                                                |
+| F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings`               | Awaiting confirmation                                                                     | Awaiting confirmation                | Pending integration                                                                |
 | Feature | Malak: frontend | Marianna: backend | Qingling: data and verification | Integration |
 | --- | --- | --- | --- | --- |
 | F1 Registration, login, course selection and logout | **Connected and locally tested**, 5 Oct 2026 | Implemented; 19 backend checks passed, with validation/test-isolation fixes | Independent verification pending | Local integration passed; team review pending |
@@ -72,6 +80,72 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Malak: F3 and F4 sample frontends are now complete; connect F2 when its backend is ready.
 - Marianna next: profile/options endpoints, persistent relationships, ownership rules, photo storage/upload/removal and consistent Save/Cancel behavior.
 - Qingling next: independently verify profile fields, user isolation, file errors, save/cancel and responsive layouts; verify real persistence and authorization after integration.
+
+### F2 - Backend completed on 5 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - Persistent SQLite tables: `skills`, `interests`, `connection_goals`, `profiles`, `profile_skills`, `profile_interests`, `profile_goals` with foreign key integrity, cascade deletion, and seed data matching Malak's frontend vocabulary.
+  - Endpoints implemented:
+    - `GET /api/profile-options` (and `/api/profile/options`): returns active vocabulary for skills, interests, and goals.
+    - `GET /api/profiles/me` (and `/api/profile/me`): returns authenticated learner profile with display name, course, bio, photoUrl or null, and selected options.
+    - `PATCH /api/profiles/me` (and `/api/profile/me`, `PUT`): atomic transaction updating display name, bio, skills, interests, and goals with validation (name length 2-80, bio max 500, vocabulary checks).
+    - `POST /api/profiles/me/photo`: multipart upload via `multer` with format checks (JPG, PNG, WebP only) and 5 MB size limit.
+    - `DELETE /api/profiles/me/photo`: removes photo file from disk and resets database photoUrl to null.
+    - `GET /api/profiles/:userId`: public profile view for other learners, strictly excluding email, password_hash, role, and private fields; blocks suspended users.
+- Checks: 27 automated tests passing in [backend/test.js](backend/test.js) covering all 7 FR-02 acceptance criteria.
+- Qingling next: independently verify profile fields, persistence across sessions, file errors, and direct unauthorized requests.
+- Malak next: review the locally integrated profile flow; Qingling's independent verification remains pending.
+
+### F3 - Backend completed on 6 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - Discovery filtering endpoint: `GET /api/profiles` with text search query, course filter, multi-select skills, interests, and goals.
+  - Filter logic: OR within each multi-select group, AND across groups, clear filters returns full community list.
+  - Server-enforced exclusion of viewer (`req.user.id`) and suspended accounts (`status === 'active'`).
+  - Factual explainable fit engine (`calculateFitReasons`): shared interests, shared skills, shared goals, cross-course collaboration, and fallback to `"No shared criteria found yet."`.
+  - Updated `GET /api/profiles/:userId` to include consistent `fitReasons`.
+  - Strict privacy protection: private account fields (`email`, `password_hash`, `role`, `status`) omitted from all responses.
+  - Pagination support: `page`, `limit`, `total`, `totalPages`.
+- Checks: 40 automated tests passing in [backend/test.js](backend/test.js) covering all 9 FR-03 acceptance criteria.
+- Qingling next: independently verify combined filters, fit explanations across course pairs, search results, and privacy rules.
+- Malak next: review the locally integrated discovery flow; Qingling's independent verification remains pending.
+
+### F4 - Backend completed on 7 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - SQLite schema for `conversations`, `messages`, and `conversation_reads` tables with canonical participant ordering to prevent duplicates.
+  - Endpoints implemented:
+    - `GET /api/conversations`: lists user's conversations with other participant summary, last message preview, unread count, sorted by latest activity descending.
+    - `POST /api/conversations`: starts or reuses 1-on-1 conversations with deduplication and optional initial text message.
+    - `GET /api/conversations/:id/messages`: chronological message history with server-enforced 2-participant isolation.
+    - `POST /api/conversations/:id/messages`: sends text message (1-2000 chars) with suspension checks.
+    - `POST /api/conversations/:id/read`: clears unread message count for that conversation.
+  - Security & privacy: server-enforced isolation (403 for third parties), self-messaging rejection (400), suspended account blocking for senders and recipients (403), private fields (email, password_hash, role) strictly omitted.
+- Checks: 51 automated tests passing in [backend/test.js](backend/test.js) covering all 10 FR-04 acceptance criteria.
+- Qingling next: independently verify message order, chat isolation, unread clearing, direct API authorization, and persistence.
+- Malak next: connect frontend `messagingService.js` to real backend endpoints.
+
+### F5 - Backend completed on 8 October 2026
+
+- Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
+- Delivered:
+  - SQLite schema updates: `categories` table (`id`, `name`, `is_active`) and `category_id` foreign key migrated to `skills` and `interests`.
+  - Default administrator account seeded: `admin@example.com` (`AdminPassword123!`) with `role === 'admin'`.
+  - Endpoints implemented:
+    - `GET /api/admin/workspace` (and `/api/admin/load`): consolidated workspace state snapshot (counts, managed lists, categories, user directory).
+    - `GET /api/admin/users`: lists users with status filter (`all`, `active`, `suspended`) and text search query across name and email.
+    - `GET /api/admin/users/:id`: inspects user profile while strictly excluding private messages and conversations to guarantee student privacy.
+    - `PATCH /api/admin/users/:id`: corrects course assignment and moderates user status; suspending a user immediately purges active sessions (`DELETE FROM sessions WHERE user_id = ?`) and blocks login.
+    - `GET /api/admin/:kind`: retrieves managed taxonomy records (`skills`, `interests`, `courses`, `connection-goals`, `categories`) including inactive items.
+    - `POST /api/admin/:kind`: creates new taxonomy item with normalized duplicate check and active category validation.
+    - `PATCH /api/admin/:kind/:id`: updates name, category association, and soft deactivation/activation (`is_active: 0/1`) without physical deletion to preserve historical references.
+  - Role-based authorization: `adminMiddleware` strictly gates all `/api/admin/*` endpoints (`401 Unauthorized` for unauthenticated, `403 Forbidden` for learners).
+- Checks: 61 automated tests passing in [backend/test.js](backend/test.js) covering all 8 FR-05 acceptance criteria.
+- Qingling next: independently verify admin authorization, category filtering, duplicate rejection, soft deactivation, session revocation, and learner privacy.
+- Malak next: connect frontend `adminService.js` to real backend endpoints.
 
 ### Record for each subsequent completed frontend feature
 
