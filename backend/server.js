@@ -1675,6 +1675,197 @@ app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
   }
 });
 
+// =============================================================
+// FR-06: ACCOUNT SETTINGS
+// =============================================================
+
+// Rate limiting map for password verification
+// Key: userId, Value: { count: number, firstAttemptTime: number }
+const passwordAttemptLimiter = new Map();
+const MAX_PASSWORD_ATTEMPTS = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+// -------------------------------------------------------------
+// 26. Get Account Settings (GET /api/account)
+// -------------------------------------------------------------
+app.get(['/api/account', '/api/account/settings'], authMiddleware, (req, res) => {
+  try {
+    const user = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status, 
+        courses.name AS course_name
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      WHERE users.id = ?
+    `).get(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    res.json({
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email,
+      courseId: user.course_id,
+      courseName: user.course_name,
+      role: user.role,
+      status: user.status
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve account settings' });
+  }
+});
+
+// -------------------------------------------------------------
+// 27. Update Account Settings (PATCH / PUT /api/account)
+// -------------------------------------------------------------
+function handleUpdateAccount(req, res) {
+  try {
+    const { displayName, courseId } = req.body;
+
+    if (displayName === undefined && courseId === undefined) {
+      return res.status(400).json({ error: 'Provide at least one field to update (displayName or courseId)' });
+    }
+
+    let trimmedName = undefined;
+    if (displayName !== undefined) {
+      if (typeof displayName !== 'string') {
+        return res.status(400).json({ error: 'Display name must be a string' });
+      }
+      trimmedName = displayName.trim();
+      if (trimmedName.length < 1 || trimmedName.length > 80) {
+        return res.status(400).json({ error: 'Enter a name between 1 and 80 characters.' });
+      }
+    }
+
+    let validCourse = undefined;
+    if (courseId !== undefined) {
+      validCourse = db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
+      if (!validCourse) {
+        return res.status(400).json({ error: 'Choose an active course.' });
+      }
+    }
+
+    const updateTx = db.transaction(() => {
+      if (trimmedName !== undefined && validCourse !== undefined) {
+        db.prepare('UPDATE users SET display_name = ?, course_id = ? WHERE id = ?').run(trimmedName, validCourse.id, req.user.id);
+      } else if (trimmedName !== undefined) {
+        db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(trimmedName, req.user.id);
+      } else if (validCourse !== undefined) {
+        db.prepare('UPDATE users SET course_id = ? WHERE id = ?').run(validCourse.id, req.user.id);
+      }
+    });
+
+    updateTx();
+
+    const updatedUser = db.prepare(`
+      SELECT 
+        users.id, 
+        users.display_name, 
+        users.email, 
+        users.course_id, 
+        users.role, 
+        users.status, 
+        courses.name AS course_name
+      FROM users
+      JOIN courses ON users.course_id = courses.id
+      WHERE users.id = ?
+    `).get(req.user.id);
+
+    res.json({
+      id: updatedUser.id,
+      displayName: updatedUser.display_name,
+      email: updatedUser.email,
+      courseId: updatedUser.course_id,
+      courseName: updatedUser.course_name,
+      role: updatedUser.role,
+      message: 'Account settings updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update account settings' });
+  }
+}
+
+app.patch(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
+app.put(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
+
+// -------------------------------------------------------------
+// 28. Change Password with Reauthentication (POST /api/account/password)
+// -------------------------------------------------------------
+app.post('/api/account/password', authMiddleware, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const now = Date.now();
+
+    // Check brute-force rate limit
+    const attemptRecord = passwordAttemptLimiter.get(userId);
+    if (attemptRecord) {
+      if (now - attemptRecord.firstAttemptTime > RATE_LIMIT_WINDOW_MS) {
+        passwordAttemptLimiter.delete(userId);
+      } else if (attemptRecord.count >= MAX_PASSWORD_ATTEMPTS) {
+        return res.status(429).json({ error: 'Too many failed password attempts. Please try again later.' });
+      }
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    // Fetch user password hash
+    const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    // Reauthenticate current password
+    const isCurrentValid = bcrypt.compareSync(currentPassword, user.password_hash);
+    if (!isCurrentValid) {
+      const currentAttempts = passwordAttemptLimiter.get(userId) || { count: 0, firstAttemptTime: now };
+      currentAttempts.count += 1;
+      passwordAttemptLimiter.set(userId, currentAttempts);
+      return res.status(401).json({ error: 'The current sample password is incorrect.' });
+    }
+
+    // Validate new password rules
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'Use between 8 and 128 characters.' });
+    }
+
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: 'Choose a different password.' });
+    }
+
+    // Hash new password
+    const newHash = bcrypt.hashSync(newPassword, 10);
+
+    const updatePasswordTx = db.transaction(() => {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+      // Revoke all other active sessions while preserving current token
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, req.token);
+    });
+
+    updatePasswordTx();
+
+    // Reset rate limiter on success
+    passwordAttemptLimiter.delete(userId);
+
+    res.json({
+      message: 'Password updated successfully. Other active sessions have been revoked.',
+      sessionsRevoked: true
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 // Start the server if file is executed directly
 if (require.main === module) {
   app.listen(PORT, () => {
