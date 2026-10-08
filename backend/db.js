@@ -1,5 +1,6 @@
 const path = require('path');
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 
 const dbPath = path.join(__dirname, 'database.sqlite');
 const db = new Database(dbPath);
@@ -134,7 +135,28 @@ db.exec(`
     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  -- 14. Taxonomy categories (FR-05)
+  CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active);
 `);
+
+// Migration: Ensure category_id column exists on skills and interests
+const skillCols = db.prepare("PRAGMA table_info(skills)").all().map(c => c.name);
+if (!skillCols.includes('category_id')) {
+  db.exec("ALTER TABLE skills ADD COLUMN category_id TEXT REFERENCES categories(id) ON DELETE SET NULL");
+}
+
+const interestCols = db.prepare("PRAGMA table_info(interests)").all().map(c => c.name);
+if (!interestCols.includes('category_id')) {
+  db.exec("ALTER TABLE interests ADD COLUMN category_id TEXT REFERENCES categories(id) ON DELETE SET NULL");
+}
 
 // Backfill empty profile rows for any existing users
 db.exec(`
@@ -151,6 +173,11 @@ const seedCourse = db.prepare(`
 seedCourse.run('software-dev', 'Software Development', 1);
 seedCourse.run('business-dev', 'Business Development', 1);
 
+// Initial categories seeding (FR-05)
+const seedCategory = db.prepare('INSERT OR IGNORE INTO categories (id, name, is_active) VALUES (?, ?, 1)');
+seedCategory.run('technical', 'Technical');
+seedCategory.run('business', 'Business');
+
 // Initial skills seeding
 const seedSkill = db.prepare('INSERT OR IGNORE INTO skills (id, name, is_active) VALUES (?, ?, 1)');
 [
@@ -164,6 +191,10 @@ const seedSkill = db.prepare('INSERT OR IGNORE INTO skills (id, name, is_active)
   ['marketing', 'Marketing'],
   ['product-strategy', 'Product strategy']
 ].forEach(([id, name]) => seedSkill.run(id, name));
+
+// Associate default skills with categories
+db.prepare("UPDATE skills SET category_id = 'technical' WHERE id IN ('react', 'javascript', 'ui-design', 'accessibility', 'nodejs', 'python') AND (category_id IS NULL OR category_id = '')").run();
+db.prepare("UPDATE skills SET category_id = 'business' WHERE id IN ('market-research', 'marketing', 'product-strategy') AND (category_id IS NULL OR category_id = '')").run();
 
 // Initial interests seeding
 const seedInterest = db.prepare('INSERT OR IGNORE INTO interests (id, name, is_active) VALUES (?, ?, 1)');
@@ -183,5 +214,16 @@ const seedGoal = db.prepare('INSERT OR IGNORE INTO connection_goals (id, name, i
   ['peer-support', 'Peer support'],
   ['friendship', 'Friendship']
 ].forEach(([id, name]) => seedGoal.run(id, name));
+
+// Seed default administrator user if not exists (FR-05)
+const existingAdmin = db.prepare("SELECT id FROM users WHERE email = 'admin@example.com'").get();
+if (!existingAdmin) {
+  const adminPasswordHash = bcrypt.hashSync('AdminPassword123!', 10);
+  db.prepare(`
+    INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
+    VALUES (?, 'admin@example.com', ?, 'Administrator', 'software-dev', 'admin', 'active')
+  `).run('admin-root', adminPasswordHash);
+  db.prepare("INSERT OR IGNORE INTO profiles (user_id, bio) VALUES ('admin-root', 'Platform Administrator')").run();
+}
 
 module.exports = db;

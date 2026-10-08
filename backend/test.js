@@ -1,6 +1,6 @@
 /**
  * Automated test suite for Marianna's backend requirements and Qingling's criteria
- * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), and FR-04 (Private Messaging)
+ * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), FR-04 (Private Messaging), and FR-05 (Administration)
  * Usage: npm test
  */
 
@@ -10,7 +10,7 @@ const app = require('./server');
 const db = require('./db');
 
 async function runTests() {
-  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02, FR-03 & FR-04) ===\n');
+  console.log('\n=== STARTING BACKEND API TESTS (FR-01, FR-02, FR-03, FR-04 & FR-05) ===\n');
 
   // Start server on an ephemeral port
   const server = app.listen(0);
@@ -31,8 +31,10 @@ async function runTests() {
   }
 
   try {
-    // Clean up test users before tests (if any remain)
+    // Clean up test users and admin fixtures before tests (if any remain)
     db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
+    db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
+    db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
 
     // =========================================================
     // FR-01: AUTHENTICATION & COURSES
@@ -922,12 +924,294 @@ async function runTests() {
       'TEST 51: Conversation participant summaries strictly exclude email, password_hash, role, and private fields'
     );
 
+    // =========================================================
+    // FR-05: ADMINISTRATION
+    // =========================================================
+
+    // TEST 52: Only administrators can access administration pages and operations (Acceptance Criterion 1)
+    const resLearnerAdminAccess = await fetch(`${baseUrl}/admin/workspace`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const resLearnerCreateSkill = await fetch(`${baseUrl}/admin/skills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ name: 'Unauthorized Skill' })
+    });
+    const resLearnerUpdateUser = await fetch(`${baseUrl}/admin/users/${amaraData.user.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ status: 'suspended' })
+    });
+    const resUnauthAdminAccess = await fetch(`${baseUrl}/admin/workspace`);
+
+    assert(
+      resLearnerAdminAccess.status === 403 &&
+      resLearnerCreateSkill.status === 403 &&
+      resLearnerUpdateUser.status === 403 &&
+      resUnauthAdminAccess.status === 401,
+      'TEST 52: Only administrators can access administration endpoints; learners receive 403 and unauthenticated receive 401'
+    );
+
+    // TEST 53: Administrator authentication and workspace data load (Acceptance Criterion 1)
+    const resAdminLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', password: 'AdminPassword123!' })
+    });
+    const adminLoginData = await resAdminLogin.json();
+    const adminToken = adminLoginData.token;
+
+    const resWorkspace = await fetch(`${baseUrl}/admin/workspace`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const workspaceData = await resWorkspace.json();
+
+    assert(
+      resAdminLogin.status === 200 &&
+      adminLoginData.user.role === 'admin' &&
+      resWorkspace.status === 200 &&
+      Array.isArray(workspaceData.categories) &&
+      Array.isArray(workspaceData.skills) &&
+      Array.isArray(workspaceData.interests) &&
+      Array.isArray(workspaceData.courses) &&
+      Array.isArray(workspaceData.users),
+      'TEST 53: Administrator successfully logs in and retrieves full admin workspace data'
+    );
+
+    // TEST 54: Administrator can create and list categories and skills (Acceptance Criterion 2 & 3)
+    const resCreateCategory = await fetch(`${baseUrl}/admin/categories`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: 'Product Design' })
+    });
+    const createdCat = await resCreateCategory.json();
+
+    const resCreateSkill = await fetch(`${baseUrl}/admin/skills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: 'Figma Prototyping', categoryId: createdCat.id })
+    });
+    const createdSkill = await resCreateSkill.json();
+
+    const resListSkills = await fetch(`${baseUrl}/admin/skills`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const skillList = await resListSkills.json();
+    const foundSkill = skillList.find(s => s.id === createdSkill.id);
+
+    assert(
+      resCreateCategory.status === 201 &&
+      resCreateSkill.status === 201 &&
+      foundSkill &&
+      foundSkill.name === 'Figma Prototyping' &&
+      foundSkill.categoryId === createdCat.id,
+      'TEST 54: Administrator can create categories, associate skills with active categories, and list records'
+    );
+
+    // TEST 55: Category taxonomy association validation (Acceptance Criterion 3)
+    const resInvalidCatSkill = await fetch(`${baseUrl}/admin/skills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: 'Another Skill', categoryId: 'non-existent-cat-123' })
+    });
+    assert(
+      resInvalidCatSkill.status === 400,
+      'TEST 55: Associating skill with a non-existent or inactive category is rejected (400 Bad Request)'
+    );
+
+    // TEST 56: Duplicate name rejection after whitespace and case normalization (Acceptance Criterion 4)
+    const resDupCategory = await fetch(`${baseUrl}/admin/categories`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: '  product   design  ' })
+    });
+    const resDupSkill = await fetch(`${baseUrl}/admin/skills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: 'FIGMA PROTOTYPING' })
+    });
+    const resEmptyName = await fetch(`${baseUrl}/admin/skills`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: '   ' })
+    });
+    assert(
+      resDupCategory.status === 409 &&
+      resDupSkill.status === 409 &&
+      resEmptyName.status === 400,
+      'TEST 56: Duplicate names within the same managed list are rejected after whitespace and case normalization'
+    );
+
+    // TEST 57: Rename and deactivate managed records (Acceptance Criterion 2 & 9)
+    const resRenameSkill = await fetch(`${baseUrl}/admin/skills/${createdSkill.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ name: 'Advanced Figma' })
+    });
+    const renamedSkill = await resRenameSkill.json();
+
+    const resDeactivateSkill = await fetch(`${baseUrl}/admin/skills/${createdSkill.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ active: false })
+    });
+    const deactivatedSkill = await resDeactivateSkill.json();
+
+    assert(
+      resRenameSkill.status === 200 &&
+      renamedSkill.name === 'Advanced Figma' &&
+      resDeactivateSkill.status === 200 &&
+      deactivatedSkill.active === false,
+      'TEST 57: Administrator can rename and deactivate managed records without deleting them'
+    );
+
+    // TEST 58: Deactivated values cannot be selected for new assignments (Acceptance Criterion 5)
+    const resLearnerOptions = await fetch(`${baseUrl}/profile-options`);
+    const learnerOptions = await resLearnerOptions.json();
+
+    const resSelectDeactivated = await fetch(`${baseUrl}/profiles/me`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ skills: ['Advanced Figma'] })
+    });
+
+    assert(
+      !learnerOptions.skills.includes('Advanced Figma') &&
+      resSelectDeactivated.status === 400,
+      'TEST 58: Deactivated skills cannot be selected for new profile assignments'
+    );
+
+    // TEST 59: User management, list filtering, and course assignment correction (Acceptance Criterion 6)
+    const resAdminSearch = await fetch(`${baseUrl}/admin/users?query=alex`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const searchUsersData = await resAdminSearch.json();
+
+    const resCorrectCourse = await fetch(`${baseUrl}/admin/users/${testUserId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ courseId: 'business-dev' })
+    });
+    const correctedUserData = await resCorrectCourse.json();
+
+    assert(
+      resAdminSearch.status === 200 &&
+      searchUsersData.users.some(u => u.id === testUserId) &&
+      resCorrectCourse.status === 200 &&
+      correctedUserData.courseId === 'business-dev',
+      'TEST 59: Administrator can list/search users and correct user course assignments'
+    );
+
+    // TEST 60: Account suspension revokes active sessions and excludes user from discovery (Acceptance Criterion 7)
+    // Suspend user Alex who is currently logged in with authToken
+    const resSuspendUser = await fetch(`${baseUrl}/admin/users/${testUserId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ status: 'suspended' })
+    });
+    const suspendResult = await resSuspendUser.json();
+
+    // Alex's existing session token must now be rejected
+    const resAlexAccessWithRevokedSession = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    // Alex cannot log in again
+    const resAlexLoginAttempt = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: testUser.password })
+    });
+
+    // Alex is excluded from discovery
+    const resDiscoveryExclusion = await fetch(`${baseUrl}/profiles`, {
+      headers: { Authorization: `Bearer ${amaraData.token}` }
+    });
+    const discoveryExclusionData = await resDiscoveryExclusion.json();
+    const isAlexInDiscovery = discoveryExclusionData.profiles.some(p => p.id === testUserId);
+
+    // Reactivate Alex to restore clean state
+    await fetch(`${baseUrl}/admin/users/${testUserId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ status: 'active', courseId: 'software-dev' })
+    });
+
+    assert(
+      resSuspendUser.status === 200 &&
+      suspendResult.status === 'suspended' &&
+      suspendResult.revokedSessions >= 1 &&
+      resAlexAccessWithRevokedSession.status === 401 &&
+      resAlexLoginAttempt.status === 403 &&
+      !isAlexInDiscovery,
+      'TEST 60: User suspension immediately revokes sessions, prevents login (403), and removes user from discovery'
+    );
+
+    // TEST 61: User management does not grant routine access to private messages (Acceptance Criterion 8)
+    const resUserInspection = await fetch(`${baseUrl}/admin/users/${testUserId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const userInspectionData = await resUserInspection.json();
+
+    assert(
+      resUserInspection.status === 200 &&
+      userInspectionData.id === testUserId &&
+      userInspectionData.messages === undefined &&
+      userInspectionData.conversations === undefined &&
+      userInspectionData.chats === undefined,
+      'TEST 61: User inspection endpoints strictly exclude student conversations and private messages'
+    );
+
   } catch (err) {
     console.error('Error during test execution:', err);
     failed++;
   } finally {
     // Clean up test records
     db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
+    db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
+    db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
 
     server.close();
     console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);

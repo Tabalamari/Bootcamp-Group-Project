@@ -1,10 +1,11 @@
-# Backend: Bootcamp Connect (FR-01, FR-02, FR-03 & FR-04)
+# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04 & FR-05)
 
 Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
 - **FR-02:** User profiles, options vocabulary, profile viewing/editing, photo uploads/removal, and community profiles.
 - **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.
 - **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking).
+- **FR-05:** Administration (admin workspace data, taxonomy & category management, soft deactivation, duplicate prevention, learner course correction, session revocation upon suspension, strict privacy isolation for student chats).
 
 **Owner:** Marianna  
 **Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `multer`, `bcryptjs`, Bearer Token (UUID)
@@ -26,17 +27,22 @@ npm start
 npm run dev
 ```
 The server will start at: `http://localhost:3000`  
-The database `database.sqlite` is created automatically with all tables and seeded with active courses, skills, interests, and connection goals. Static uploads are served from `/uploads`.
+The database `database.sqlite` is created automatically with all tables, seeded with active courses, skills, interests, connection goals, categories, and an initial administrator account:
+- **Admin Email:** `admin@example.com`
+- **Admin Password:** `AdminPassword123!`
+
+Static uploads are served from `/uploads`.
 
 ### 3. Automated Testing (for Marianna and Qingling)
 ```bash
 npm test
 ```
-The script runs 51 automated checks verifying:
+The script runs 61 automated checks verifying:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
 - All 10 FR-04 acceptance criteria (start conversation and send 1-2000 chars text, conversation deduplication, self-messaging prohibition, server-enforced 2-participant isolation, chronological order with sender/timestamp, persistent storage across sessions, inbox preview with unread count, draft preservation on validation errors, suspended account blocking for senders and recipients, manual refresh compatibility).
+- All 8 FR-05 acceptance criteria (admin role-based access control with 401/403 enforcement, workspace state hydration, taxonomy category management, duplicate validation across case/whitespace, safe deactivation without physical deletion, immediate session revocation upon suspension, learner course correction, and privacy protection excluding private messages from admin inspection).
 
 ---
 
@@ -339,20 +345,151 @@ Base URL: `http://localhost:3000/api`
 
 ---
 
+### FR-05: Administration (Administrator Protected)
+
+All administrator endpoints require an active session belonging to a user with `role === 'admin'`. Authenticated users with `role === 'learner'` receive `403 Forbidden`. Unauthenticated requests receive `401 Unauthorized`.
+
+#### 18. Administrator Workspace Data
+- **`GET /api/admin/workspace`** (also accessible via **`GET /api/admin/load`**)
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Success (200 OK):** returns the complete consolidated operational snapshot:
+    ```json
+    {
+      "counts": {
+        "users": 15,
+        "skills": 9,
+        "interests": 5,
+        "goals": 4,
+        "courses": 2,
+        "categories": 2
+      },
+      "lists": {
+        "skills": [ { "id": "javascript", "name": "JavaScript", "categoryId": "technical", "active": true } ],
+        "interests": [ { "id": "technology", "name": "Technology", "active": true } ],
+        "goals": [ { "id": "project-collab", "name": "Project collaboration", "active": true } ],
+        "courses": [ { "id": "software-dev", "name": "Software Development", "active": true } ]
+      },
+      "categories": [
+        { "id": "technical", "name": "Technical", "active": true },
+        { "id": "business", "name": "Business", "active": true }
+      ],
+      "users": [ ... ]
+    }
+    ```
+
+#### 19. Administrator User Directory
+- **`GET /api/admin/users`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Query Parameters (optional):**
+    - `query` (string): case-insensitive search by user display name or email.
+    - `status` (string, `all` | `active` | `suspended`): status filter.
+  - **Success (200 OK):**
+    ```json
+    {
+      "users": [
+        {
+          "id": "u-1",
+          "displayName": "Alex Rivers",
+          "email": "alex@example.com",
+          "courseId": "software-dev",
+          "courseName": "Software Development",
+          "role": "learner",
+          "status": "active",
+          "bio": "Enthusiastic full-stack student...",
+          "photoUrl": "/uploads/...",
+          "skills": ["JavaScript", "Node.js"],
+          "interests": ["Technology"]
+        }
+      ]
+    }
+    ```
+
+#### 20. Administrator User Inspection Detail
+- **`GET /api/admin/users/:id`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Success (200 OK):** returns learner profile, assigned skills, interests, and goals.
+  - **Privacy Guarantee (Acceptance Criterion 8):** strictly excludes private messages and conversations.
+
+#### 21. Administrator User Moderation / Suspension
+- **`PATCH /api/admin/users/:id`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "courseId": "business-dev",
+      "status": "suspended"
+    }
+    ```
+  - **Success (200 OK):**
+    ```json
+    {
+      "id": "u-1",
+      "displayName": "Alex Rivers",
+      "courseId": "business-dev",
+      "courseName": "Business Development",
+      "status": "suspended",
+      "revokedSessions": 1
+    }
+    ```
+  - **Acceptance Criterion 7:** Setting `status: "suspended"` immediately revokes all active database sessions (`DELETE FROM sessions WHERE user_id = ?`), preventing ongoing access, subsequent login attempts (returns `403 Forbidden`), and excluding the account from community discovery.
+
+#### 22. List Managed Taxonomy Records
+- **`GET /api/admin/:kind`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **URL Parameter `:kind`:** `skills` | `interests` | `courses` | `connection-goals` | `categories`
+  - **Success (200 OK):** returns array of records including deactivated ones:
+    ```json
+    [
+      { "id": "javascript", "name": "JavaScript", "categoryId": "technical", "active": true }
+    ]
+    ```
+
+#### 23. Create Managed Taxonomy Record
+- **`POST /api/admin/:kind`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "name": "Cloud Architecture",
+      "categoryId": "technical"
+    }
+    ```
+  - **Validation:**
+    - Name length: 1–80 characters.
+    - Duplicate rejection (`409 Conflict`): normalized case-insensitive comparison across existing records.
+    - Category check: if `categoryId` is supplied for skills/interests, it must point to an active category.
+  - **Success (201 Created):** returns created record with generated ID.
+
+#### 24. Update or Deactivate Managed Record
+- **`PATCH /api/admin/:kind/:id`**
+  - **Header:** `Authorization: Bearer <admin_token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "name": "Updated Name",
+      "categoryId": "technical",
+      "active": false
+    }
+    ```
+  - **Soft Deactivation (Acceptance Criterion 5):** records are preserved (`is_active = 0`) to safeguard historical references and learner profile data without performing physical deletion.
+
+---
+
 ## 🗄 SQLite Database Schema
 
 The `database.sqlite` file is created and migrated automatically:
 
 1. **`courses`**: `id` (TEXT, PK), `name` (TEXT), `is_active` (INTEGER).
-2. **`users`**: `id` (TEXT, PK), `email` (TEXT, UNIQUE), `password_hash` (TEXT), `display_name` (TEXT), `course_id` (TEXT, FK), `role` (TEXT), `status` (TEXT), `created_at` (DATETIME).
-3. **`sessions`**: `token` (TEXT, PK), `user_id` (TEXT, FK), `created_at` (DATETIME).
-4. **`skills`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `is_active` (INTEGER).
-5. **`interests`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `is_active` (INTEGER).
-6. **`connection_goals`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `is_active` (INTEGER).
-7. **`profiles`**: `user_id` (TEXT, PK, FK users), `bio` (TEXT), `photo_url` (TEXT), `created_at` (DATETIME), `updated_at` (DATETIME).
-8. **`profile_skills`**: `(user_id, skill_id)` (PK, FKs).
-9. **`profile_interests`**: `(user_id, interest_id)` (PK, FKs).
-10. **`profile_goals`**: `(user_id, goal_id)` (PK, FKs).
-11. **`conversations`**: `id` (TEXT, PK), `participant1_id` (TEXT, FK), `participant2_id` (TEXT, FK), `created_at` (DATETIME), `updated_at` (DATETIME), `UNIQUE(participant1_id, participant2_id)`.
-12. **`messages`**: `id` (TEXT, PK), `conversation_id` (TEXT, FK), `sender_id` (TEXT, FK), `text` (TEXT), `created_at` (DATETIME).
-13. **`conversation_reads`**: `(conversation_id, user_id)` (PK, FKs), `last_read_at` (DATETIME).
+2. **`categories`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `is_active` (INTEGER).
+3. **`users`**: `id` (TEXT, PK), `email` (TEXT, UNIQUE), `password_hash` (TEXT), `display_name` (TEXT), `course_id` (TEXT, FK), `role` (TEXT), `status` (TEXT), `created_at` (DATETIME).
+4. **`sessions`**: `token` (TEXT, PK), `user_id` (TEXT, FK), `created_at` (DATETIME).
+5. **`skills`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `category_id` (TEXT, FK categories), `is_active` (INTEGER).
+6. **`interests`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `category_id` (TEXT, FK categories), `is_active` (INTEGER).
+7. **`connection_goals`**: `id` (TEXT, PK), `name` (TEXT, UNIQUE), `is_active` (INTEGER).
+8. **`profiles`**: `user_id` (TEXT, PK, FK users), `bio` (TEXT), `photo_url` (TEXT), `created_at` (DATETIME), `updated_at` (DATETIME).
+9. **`profile_skills`**: `(user_id, skill_id)` (PK, FKs).
+10. **`profile_interests`**: `(user_id, interest_id)` (PK, FKs).
+11. **`profile_goals`**: `(user_id, goal_id)` (PK, FKs).
+12. **`conversations`**: `id` (TEXT, PK), `participant1_id` (TEXT, FK), `participant2_id` (TEXT, FK), `created_at` (DATETIME), `updated_at` (DATETIME), `UNIQUE(participant1_id, participant2_id)`.
+13. **`messages`**: `id` (TEXT, PK), `conversation_id` (TEXT, FK), `sender_id` (TEXT, FK), `text` (TEXT), `created_at` (DATETIME).
+14. **`conversation_reads`**: `(conversation_id, user_id)` (PK, FKs), `last_read_at` (DATETIME).
