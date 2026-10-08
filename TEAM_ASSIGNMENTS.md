@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 5 October 2026
+Last updated: 8 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-05
 
@@ -27,9 +27,9 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | Feature                                                             | Malak: frontend                                                         | Marianna: backend                                                                       | Qingling: git, data and verification | Integration                                   |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
 | F1 Registration, login, course selection and logout                 | **Connected and locally tested**, 5 Oct 2026                            | Implemented; 19 backend checks passed, with validation/test-isolation fixes             | Independent verification pending     | Local integration passed; team review pending |
-| F2 Profile viewing/editing and profile photos                       | **Done (sample data)**, 5 Oct 2026; `feature/frontend-profile`          | Implemented; 27 backend checks passed (F1 + F2), covering all 7 acceptance criteria     | Awaiting confirmation                | Pending integration                           |
-| F3 Discovery, filters and fit explanations                          | **Done (sample data)**, 5 Oct 2026; `feature/frontend-discovery`        | Implemented; 40 backend checks passed (F1, F2 & F3), covering all 9 acceptance criteria | Awaiting confirmation                | Pending integration                           |
-| F4 Conversations, messages and unread indicators                    | **Done (sample data)**, 5 Oct 2026; `feature/frontend-messaging`        | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
+| F2 Profile viewing/editing and profile photos                       | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F3 Discovery, filters and fit explanations                          | **Connected and locally tested**, 7 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
+| F4 Conversations, messages and unread indicators                    | **In progress**, 8 Oct 2026; `feature/integrate-messaging` (API adapter connected; authenticated chat flow pending) | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Proxy/API check passed; end-to-end verification pending |
 | F5 Administration: users, courses, categories, skills and interests | **Done (sample data)**, 5 Oct 2026; `feature/frontend-administration`   | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
 | F6 Account settings: name, course and password changes              | **Done (sample data)**, 5 Oct 2026; `feature/frontend-account-settings` | Awaiting confirmation                                                                   | Awaiting confirmation                | Pending integration                           |
 
@@ -87,7 +87,7 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
     - `GET /api/profiles/:userId`: public profile view for other learners, strictly excluding email, password_hash, role, and private fields; blocks suspended users.
 - Checks: 27 automated tests passing in [backend/test.js](backend/test.js) covering all 7 FR-02 acceptance criteria.
 - Qingling next: independently verify profile fields, persistence across sessions, file errors, and direct unauthorized requests.
-- Malak next: connect frontend `profileService.js` to real backend endpoints.
+- Malak next: review the locally integrated profile flow; Qingling's independent verification remains pending.
 
 ### F3 - Backend completed on 6 October 2026
 
@@ -102,7 +102,7 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
   - Pagination support: `page`, `limit`, `total`, `totalPages`.
 - Checks: 40 automated tests passing in [backend/test.js](backend/test.js) covering all 9 FR-03 acceptance criteria.
 - Qingling next: independently verify combined filters, fit explanations across course pairs, search results, and privacy rules.
-- Malak next: connect frontend `discoveryService.js` to real backend endpoints.
+- Malak next: review the locally integrated discovery flow; Qingling's independent verification remains pending.
 
 ### Record for each subsequent completed frontend feature
 
@@ -132,7 +132,7 @@ Registration, course selection, login, a welcome screen and logout are available
 
 Validation completed: production build; three automated validation/demo-service tests; browser walkthrough of registration, invalid login, successful login, logout, signed-out welcome-screen gating and demo reset. Layout overflow checks passed at 320px, 390px, 1024px and 1440px; desktop and mobile screenshots were reviewed. These checks do not replace Qingling's independent verification or backend security checks.
 
-Next: F1 is connected locally, F2 is completed with sample data, and F3 is completed with sample data; F4 messaging is completed with sample data; F5 administration is completed with sample data; F6 account settings is completed with sample data. Next: frontend review, backend integration and independent verification. F2 needs its own backend endpoints before integration. Setup instructions, sample credentials and the proposed APIs are in [frontend/README.md](frontend/README.md).
+Current next steps: complete authenticated F4 messaging verification, then connect F5/F6 when their backend APIs are ready. F2/F3 are already integrated locally; Qingling's independent verification remains pending. Setup instructions and API details are in [frontend/README.md](frontend/README.md).
 
 ### Tasks
 
@@ -231,7 +231,7 @@ Marianna leads the final API agreement, Malak confirms it supports the interface
 
 ## Shared feature completion checklist
 
-F1 local integration checks pass. Independent team verification, merge approval remains open. Current work is on `feature/frontend-account-settings`, published to origin and retained as the local checkout. F6 includes the preceding F5, F4, F3, F2 and F1 integration commits; application changes have not been merged into main.
+F1 local integration checks pass. Independent team verification and merge approval remain open. F4 frontend/API connection work is in progress on `feature/integrate-messaging`; its authenticated two-account flow remains to be verified. Application changes have not been merged into main.
 
 - [x] Register a new learner with a course selection.
 - [x] Confirm the learner and course are stored correctly.
@@ -251,7 +251,7 @@ The feature is complete when all three contributions work together and the share
 - Passed: 19 backend checks, seven frontend tests, production build and real browser checks for registration, session restoration, login failures, duplicate email, logout token revocation and invalid-session recovery.
 - Marianna: review the small backend changes; add rate limiting, session expiry and remaining F6 account operations before treating full FR-01 as complete. SQLite is the implemented database; any PostgreSQL migration needs a team decision.
 - Qingling: independently verify the integrated feature and record outcomes. Her status remains pending.
-- Malak: review the connected UI, then continue F3; F2 integration awaits profile endpoints.
+- Malak: F2/F3 are integrated locally on `feature/integrate-profiles-discovery`; F4 messaging connection is in progress on `feature/integrate-messaging`.
 - Details and startup instructions: [frontend/INTEGRATION.md](frontend/INTEGRATION.md).
 - F2 and F1 integration commit `f79625a` is included in the published F3 branch. The separate F2 branch is now published to origin. Only this tracker update is being shared on main.
 
@@ -261,14 +261,19 @@ The feature is complete when all three contributions work together and the share
 - Checks: build and 10 frontend tests passed; browser search/detail/empty/filter/reset flows passed; no overflow at 320, 390, 1024 or 1440px; desktop visual reviewed.
 - Marianna: implement authenticated discovery/detail queries, managed options, pagination and server-side privacy/eligibility checks.
 - Qingling: independently verify filtering/fit evidence, then real data and privacy after backend integration.
-- Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). Sample data only; F3 backend integration is pending.
+- Handoff: [frontend/DISCOVERY_HANDOFF.md](frontend/DISCOVERY_HANDOFF.md). The 5 October frontend completion used sample data; F3 backend integration is recorded below.
 - F3 is published to origin/feature/frontend-discovery. The current local working branch is feature/frontend-account-settings. Only TEAM_ASSIGNMENTS.md is updated on main; F3 application code is not merged into main.
 - Design: restored the left sidebar on desktop/laptop with compact navigation on mobile.
-- Malak next: review all frontend features and integrate F2-F6 as backend endpoints become available.
+- Malak next: finish authenticated F4 messaging verification, then integrate F5-F6 when their backend endpoints are available.
 - Tracker reconciliation: removed duplicate outdated F1/F2/F3 rows from the latest main tracker; current statuses and Marianna's completed F1 work are retained.
 
 - Design: restored the left sidebar on desktop/laptop and compact mobile navigation.
 - Tracker reconciliation: consolidated duplicate outdated F1-F3 rows from main; current statuses and Marianna's completed F1 work are retained.
+
+## F2/F3 backend integration - 7 October 2026
+
+- Connected profile viewing/editing and discovery/filtering to Marianna's APIs on `feature/integrate-profiles-discovery`.
+- Checks: the F1–F3 backend suite passed 40 checks; local F2/F3 integration and frontend checks passed. Independent verification by Qingling remains pending.
 
 ## F4 frontend implementation - 5 October 2026
 
@@ -277,6 +282,14 @@ The feature is complete when all three contributions work together and the share
 - Marianna: persistent messaging APIs, participant authorization, unread/read state, update delivery and duplicate prevention.
 - Qingling: independent message order, isolation, retry, unread and responsive checks; persistence/security checks after integration.
 - Handoff: [F4 messaging handoff](https://github.com/Tabalamari/Bootcamp-Group-Project/blob/feature/frontend-messaging/frontend/MESSAGING_HANDOFF.md). Sample data resets on reload; real messaging integration remains pending. F4 is pushed to its own branch; only this tracker is updated on main. Application changes are not merged into main.
+
+## F4 backend integration - 8 October 2026
+
+- Connected the inbox, conversation history, send, read state, inbox refresh and unread badge to Marianna's authenticated messaging APIs on `feature/integrate-messaging`.
+- Checks: 51 backend checks, 18 frontend tests and the production build passed. The Vite proxy returns 200 for courses and 401 for the protected messaging route without a token, confirming the F4 route is reachable.
+- A stale local backend initially returned 404 for messaging; it was restarted from the current F4-enabled source.
+- Qingling: independently verify authenticated two-account conversations, message order and persistence, unread clearing and participant isolation.
+- Remaining: verify the authenticated end-to-end chat flow. F4 integration changes remain local and have not been committed or pushed.
 
 ## F5 frontend completion - 5 October 2026
 
