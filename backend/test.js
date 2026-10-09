@@ -6,6 +6,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+// API tests must always use an isolated in-memory SQLite database, even if a developer's
+// backend/.env points at Supabase. This test suite creates and deletes test records.
+process.env.NODE_ENV = 'test';
+process.env.DB_CLIENT = 'sqlite';
+delete process.env.DATABASE_URL;
 process.env.DATABASE_PATH = ':memory:';
 const app = require('./server');
 const db = require('./db');
@@ -32,10 +39,21 @@ async function runTests() {
   }
 
   try {
-    // Clean up test users and admin fixtures before tests (if any remain)
+    // Clean up test records before creating this run's administrator fixture.
     await db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
     await db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
     await db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
+    const defaultAdmin = await db.prepare("SELECT id FROM users WHERE email = 'admin@example.com'").get();
+    assert(!defaultAdmin, 'Database setup does not create a default administrator with a fixed password');
+
+    const testAdminPassword = crypto.randomBytes(24).toString('base64url');
+    await db.prepare(`
+      INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
+      VALUES (?, ?, ?, ?, ?, 'admin', 'active')
+    `).run('test-admin', 'test-admin@example.com', bcrypt.hashSync(testAdminPassword, 10), 'Test Administrator', 'software-dev');
+    await db.prepare(`
+      INSERT OR IGNORE INTO profiles (user_id, bio, photo_url) VALUES (?, ?, NULL)
+    `).run('test-admin', 'Test administrator');
 
     // =========================================================
     // FR-01: AUTHENTICATION & COURSES
@@ -964,7 +982,7 @@ async function runTests() {
     const resAdminLogin = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@example.com', password: 'AdminPassword123!' })
+      body: JSON.stringify({ email: 'test-admin@example.com', password: testAdminPassword })
     });
     const adminLoginData = await resAdminLogin.json();
     const adminToken = adminLoginData.token;

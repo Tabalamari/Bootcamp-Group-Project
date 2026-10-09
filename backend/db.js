@@ -1,7 +1,14 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { AsyncLocalStorage } = require('async_hooks');
-const bcrypt = require('bcryptjs');
+
+const configuredDbClient = process.env.DB_CLIENT;
+if (configuredDbClient && !['postgres', 'sqlite'].includes(configuredDbClient)) {
+  throw new Error('DB_CLIENT must be either "postgres" or "sqlite"');
+}
+if (configuredDbClient === 'postgres' && !process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required when DB_CLIENT=postgres');
+}
 
 const isPostgresClient = process.env.DB_CLIENT === 'postgres' || 
   (Boolean(process.env.DATABASE_URL) && process.env.DB_CLIENT !== 'sqlite');
@@ -15,7 +22,7 @@ if (isPostgresClient) {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: true },
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000
@@ -98,24 +105,6 @@ if (isPostgresClient) {
       await pool.end();
     }
   };
-
-  // Ensure default administrator user exists in Supabase
-  (async () => {
-    try {
-      const existingAdmin = await dbExport.prepare("SELECT id FROM users WHERE email = 'admin@example.com'").get();
-      if (!existingAdmin) {
-        const adminPasswordHash = bcrypt.hashSync('AdminPassword123!', 10);
-        await dbExport.prepare(`
-          INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
-          VALUES ('admin-root', 'admin@example.com', ?, 'Administrator', 'software-dev', 'admin', 'active')
-          ON CONFLICT (id) DO NOTHING
-        `).run(adminPasswordHash);
-        await dbExport.prepare("INSERT INTO profiles (user_id, bio) VALUES ('admin-root', 'Platform Administrator') ON CONFLICT (user_id) DO NOTHING").run();
-      }
-    } catch (err) {
-      console.warn('[Supabase Init Warning]:', err.message);
-    }
-  })();
 
 } else {
   // SQLite fallback client
@@ -320,16 +309,6 @@ if (isPostgresClient) {
     ['peer-support', 'Peer support'],
     ['friendship', 'Friendship']
   ].forEach(([id, name]) => seedGoal.run(id, name));
-
-  const existingAdmin = sqliteDb.prepare("SELECT id FROM users WHERE email = 'admin@example.com'").get();
-  if (!existingAdmin) {
-    const adminPasswordHash = bcrypt.hashSync('AdminPassword123!', 10);
-    sqliteDb.prepare(`
-      INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
-      VALUES (?, 'admin@example.com', ?, 'Administrator', 'software-dev', 'admin', 'active')
-    `).run('admin-root', adminPasswordHash);
-    sqliteDb.prepare("INSERT OR IGNORE INTO profiles (user_id, bio) VALUES ('admin-root', 'Platform Administrator')").run();
-  }
 
   function normalizeParams(params) {
     if (params.length === 1 && Array.isArray(params[0])) {

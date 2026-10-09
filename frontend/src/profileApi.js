@@ -1,5 +1,5 @@
 const apiRoot = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
-const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || `${window.location.protocol}//${window.location.hostname}:3000`;
+const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || window.location.origin;
 function authHeaders() {
   const token = window.sessionStorage.getItem('bootcamp-connect-token');
   if (!token) throw new Error('Please sign in again to manage your profile.');

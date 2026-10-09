@@ -3,7 +3,7 @@ import { profileOptions, profileService, validatePhoto, validateProfile } from '
 import { profileApi } from './profileApi';
 import { isDemo } from './authService';
 
-const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || `${window.location.protocol}//${window.location.hostname}:3000`;
+const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || window.location.origin;
 
 export function Avatar({ photo, name, large = false }) {
   return <span className={`profile-avatar ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>}</span>;

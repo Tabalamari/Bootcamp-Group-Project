@@ -126,7 +126,7 @@ Every frontend feature must support desktop, laptop and mobile, keyboard operati
 - Owner: Marianna. Implementation: [backend/server.js](backend/server.js), [backend/db.js](backend/db.js), [backend/test.js](backend/test.js), [backend/README.md](backend/README.md).
 - Delivered:
   - SQLite schema updates: `categories` table (`id`, `name`, `is_active`) and `category_id` foreign key migrated to `skills` and `interests`.
-  - Default administrator account seeded: `admin@example.com` (`AdminPassword123!`) with `role === 'admin'`.
+  - The previous local SQLite version included a demo administrator; production administrators are now provisioned with the one-time secure `npm run admin:bootstrap` command. No fixed administrator password is used by the app.
   - Endpoints implemented:
     - `GET /api/admin/workspace` (and `/api/admin/load`): consolidated workspace state snapshot (counts, managed lists, categories, user directory).
     - `GET /api/admin/users`: lists users with status filter (`all`, `active`, `suspended`) and text search query across name and email.

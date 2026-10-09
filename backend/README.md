@@ -9,7 +9,7 @@ Backend implementation for Bootcamp Connect core features:
 - **FR-06:** Account settings (authenticated name and course updates, password changes with reauthentication, session revocation policy, rate-limited attempts).
 
 **Owner:** Marianna  
-**Stack:** Node.js, Express.js, SQLite (`better-sqlite3`), `multer`, `bcryptjs`, Bearer Token (UUID)
+**Stack:** Node.js, Express.js, PostgreSQL (Supabase) or SQLite (local/test), Supabase Storage, `multer`, `bcryptjs`, Bearer Token (UUID)
 
 ---
 
@@ -27,18 +27,28 @@ npm start
 # or in development mode with auto-reload:
 npm run dev
 ```
-The server will start at: `http://localhost:3000`  
-The database `database.sqlite` is created automatically with all tables, seeded with active courses, skills, interests, connection goals, categories, and an initial administrator account:
-- **Admin Email:** `admin@example.com`
-- **Admin Password:** `AdminPassword123!`
+The server will start at: `http://localhost:3000`. When `DB_CLIENT=sqlite`, the local database is created automatically and seeded with active courses, skills, interests, connection goals, and categories. The server does not create an administrator with a built-in password. Use the one-time `npm run admin:bootstrap` command with `ADMIN_BOOTSTRAP_EMAIL` and a unique `ADMIN_BOOTSTRAP_PASSWORD` in `backend/.env`, then remove those variables.
 
-Static uploads are served from `/uploads`.
+SQLite development photos are served from `/uploads`. In production, configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and a public Supabase Storage bucket (default `profile-photos`). The service-role key must remain server-side.
+
+### Supabase database and existing-data migration
+
+For a new Supabase project, apply `supabase-schema.sql` and then `supabase-seed.sql` in the Supabase SQL Editor. For an existing SQLite project, keep a backup of both `database.sqlite` and `uploads/`, set `DB_CLIENT=postgres` and `DATABASE_URL`, then run:
+
+```bash
+npm run db:migrate
+npm run photos:migrate
+```
+
+These commands write to the Supabase project configured in the environment and should be run intentionally, never against a project you do not mean to change. Review their output and verify the resulting records and images in Supabase before switching traffic. The migration scripts leave the SQLite database and upload files intact.
+
+Backend API tests use an in-memory SQLite database even when `backend/.env` contains Supabase settings. Never remove that isolation or run destructive tests against production data.
 
 ### 3. Automated Testing (for Marianna and Qingling)
 ```bash
 npm test
 ```
-The script runs 71 automated checks verifying:
+The API suite runs 72 automated checks verifying the following. The command also runs four unit checks for Supabase Storage URL, upload, deletion, and error behavior in `photo-storage.test.js`:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).

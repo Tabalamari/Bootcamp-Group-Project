@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test.js"
+    "test": "node test.js && node --test photo-storage.test.js",
+    "admin:bootstrap": "node bootstrap-admin.js",
+    "db:migrate": "node migrate-sqlite-to-supabase.js",
+    "photos:migrate": "node migrate-photos-to-supabase.js"
   },
   "keywords": [
     "bootcamp",
