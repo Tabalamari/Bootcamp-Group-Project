@@ -33,9 +33,9 @@ async function runTests() {
 
   try {
     // Clean up test users and admin fixtures before tests (if any remain)
-    db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
-    db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
-    db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
+    await db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
+    await db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
+    await db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
 
     // =========================================================
     // FR-01: AUTHENTICATION & COURSES
@@ -408,7 +408,7 @@ async function runTests() {
     );
 
     // TEST 26: Suspended account profile access restriction (403 Forbidden)
-    db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(testUserId);
+    await db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(testUserId);
     const resSuspendedProfile = await fetch(`${baseUrl}/profiles/${testUserId}`, {
       headers: { Authorization: `Bearer ${secondToken}` }
     });
@@ -418,7 +418,7 @@ async function runTests() {
     );
 
     // Restore test user to active status for Discovery tests
-    db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(testUserId);
+    await db.prepare("UPDATE users SET status = 'active' WHERE id = ?").run(testUserId);
 
     // TEST 27: Unauthenticated profile requests return 401
     const resUnauthProfile = await fetch(`${baseUrl}/profiles/me`);
@@ -517,7 +517,7 @@ async function runTests() {
       body: JSON.stringify(suspendedUser)
     });
     const suspData = await resSusp.json();
-    db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(suspData.user.id);
+    await db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(suspData.user.id);
 
     // TEST 28: Full Discovery List - Exclusion of self and suspended accounts (Acceptance Criterion 5)
     // Logged in as testUser (Alex Rivers, software-dev)
@@ -1426,10 +1426,11 @@ async function runTests() {
     failed++;
   } finally {
     // Clean up test records
-    db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
-    db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
-    db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
+    await db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
+    await db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
+    await db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
 
+    if (db.close) await db.close();
     server.close();
     console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);
     process.exit(failed > 0 ? 1 : 0);

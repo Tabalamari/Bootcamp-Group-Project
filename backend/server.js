@@ -2,33 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Setup uploads directory for profile photos
+// Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static(uploadsDir));
-
-// Multer storage and upload configuration
+// Multer storage setup for avatar uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${req.user.id}-${Date.now()}${ext}`);
+    const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+    cb(null, uniqueName);
   }
 });
 
@@ -47,7 +43,11 @@ const upload = multer({
   }
 });
 
-// Middleware for photo upload with custom error handling
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(uploadsDir));
+
+// Photo upload middleware with custom error handling
 function photoUploadMiddleware(req, res, next) {
   upload.single('photo')(req, res, (err) => {
     if (err) {
@@ -67,13 +67,13 @@ function photoUploadMiddleware(req, res, next) {
 }
 
 // Helper to retrieve full profile for a user
-function getUserProfile(userId) {
-  db.prepare(`
+async function getUserProfile(userId) {
+  await db.prepare(`
     INSERT OR IGNORE INTO profiles (user_id, bio, photo_url)
     VALUES (?, '', NULL)
   `).run(userId);
 
-  const row = db.prepare(`
+  const row = await db.prepare(`
     SELECT 
       users.id, 
       users.display_name, 
@@ -89,29 +89,29 @@ function getUserProfile(userId) {
 
   if (!row) return null;
 
-  const skills = db.prepare(`
+  const skills = (await db.prepare(`
     SELECT skills.name
     FROM profile_skills
     JOIN skills ON profile_skills.skill_id = skills.id
     WHERE profile_skills.user_id = ?
     ORDER BY skills.name ASC
-  `).all(userId).map(r => r.name);
+  `).all(userId)).map(r => r.name);
 
-  const interests = db.prepare(`
+  const interests = (await db.prepare(`
     SELECT interests.name
     FROM profile_interests
     JOIN interests ON profile_interests.interest_id = interests.id
     WHERE profile_interests.user_id = ?
     ORDER BY interests.name ASC
-  `).all(userId).map(r => r.name);
+  `).all(userId)).map(r => r.name);
 
-  const goals = db.prepare(`
+  const goals = (await db.prepare(`
     SELECT connection_goals.name
     FROM profile_goals
     JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
     WHERE profile_goals.user_id = ?
     ORDER BY connection_goals.name ASC
-  `).all(userId).map(r => r.name);
+  `).all(userId)).map(r => r.name);
 
   return {
     id: row.id,
@@ -131,56 +131,61 @@ app.get('/api', (req, res) => {
   res.json({
     name: 'Bootcamp Connect API',
     status: 'online',
-    version: '1.0.0'
+    version: '1.0.0',
+    dbClient: db.clientType || 'postgres'
   });
 });
 
 // Middleware for route protection (session token verification)
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Authentication required' });
+async function authMiddleware(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Session token is missing' });
+    }
+
+    const session = await db.prepare(`
+      SELECT 
+        users.id, 
+        users.email, 
+        users.display_name, 
+        users.course_id, 
+        users.role, 
+        users.status, 
+        courses.name AS course_name
+      FROM sessions
+      JOIN users ON sessions.user_id = users.id
+      JOIN courses ON users.course_id = courses.id
+      WHERE sessions.token = ?
+    `).get(token);
+
+    if (!session) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    if (session.status === 'suspended') {
+      return res.status(403).json({ error: 'Your account is suspended' });
+    }
+
+    req.user = session;
+    req.token = token;
+    next();
+  } catch (error) {
+    return res.status(500).json({ error: 'Authentication verification failed' });
   }
-
-  const token = authHeader.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'Session token is missing' });
-  }
-
-  const session = db.prepare(`
-    SELECT 
-      users.id, 
-      users.email, 
-      users.display_name, 
-      users.course_id, 
-      users.role, 
-      users.status, 
-      courses.name AS course_name
-    FROM sessions
-    JOIN users ON sessions.user_id = users.id
-    JOIN courses ON users.course_id = courses.id
-    WHERE sessions.token = ?
-  `).get(token);
-
-  if (!session) {
-    return res.status(401).json({ error: 'Invalid or expired session' });
-  }
-
-  if (session.status === 'suspended') {
-    return res.status(403).json({ error: 'Your account is suspended' });
-  }
-
-  req.user = session;
-  req.token = token;
-  next();
 }
 
 // -------------------------------------------------------------
 // 1. Get list of active courses (GET /api/courses)
 // -------------------------------------------------------------
-app.get('/api/courses', (req, res) => {
+app.get('/api/courses', async (req, res) => {
   try {
-    const courses = db.prepare(`
+    const courses = await db.prepare(`
       SELECT id, name 
       FROM courses 
       WHERE is_active = 1 
@@ -196,7 +201,7 @@ app.get('/api/courses', (req, res) => {
 // -------------------------------------------------------------
 // 2. Register a new user (POST /api/auth/register)
 // -------------------------------------------------------------
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { displayName, email, password, courseId } = req.body;
 
@@ -225,13 +230,13 @@ app.post('/api/auth/register', (req, res) => {
     }
 
     // Check course existence and active status
-    const course = db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
+    const course = await db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
     if (!course) {
       return res.status(400).json({ error: 'Selected course does not exist or is unavailable' });
     }
 
     // Check email uniqueness
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
+    const existingUser = await db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
     if (existingUser) {
       return res.status(409).json({ error: 'A user with this email is already registered' });
     }
@@ -240,20 +245,20 @@ app.post('/api/auth/register', (req, res) => {
     const userId = crypto.randomUUID();
     const passwordHash = bcrypt.hashSync(password, 10);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
       VALUES (?, ?, ?, ?, ?, 'learner', 'active')
     `).run(userId, normalizedEmail, passwordHash, trimmedName, courseId);
 
     // Auto-create empty profile
-    db.prepare(`
+    await db.prepare(`
       INSERT OR IGNORE INTO profiles (user_id, bio, photo_url)
       VALUES (?, '', NULL)
     `).run(userId);
 
     // Create session (auto-login)
     const token = crypto.randomUUID();
-    db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
+    await db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
 
     res.status(201).json({
       token,
@@ -274,7 +279,7 @@ app.post('/api/auth/register', (req, res) => {
 // -------------------------------------------------------------
 // 3. User login (POST /api/auth/login)
 // -------------------------------------------------------------
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -284,7 +289,7 @@ app.post('/api/auth/login', (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT 
         users.id, 
         users.email, 
@@ -311,7 +316,7 @@ app.post('/api/auth/login', (req, res) => {
 
     // Create session
     const token = crypto.randomUUID();
-    db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
+    await db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, user.id);
 
     res.json({
       token,
@@ -348,9 +353,9 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 5. User logout (POST /api/auth/logout)
 // -------------------------------------------------------------
-app.post('/api/auth/logout', authMiddleware, (req, res) => {
+app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   try {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(req.token);
+    await db.prepare('DELETE FROM sessions WHERE token = ?').run(req.token);
     res.json({ message: 'Successfully logged out' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to log out' });
@@ -360,11 +365,11 @@ app.post('/api/auth/logout', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 6. Profile Options (GET /api/profile-options)
 // -------------------------------------------------------------
-app.get(['/api/profile-options', '/api/profile/options'], (req, res) => {
+app.get(['/api/profile-options', '/api/profile/options'], async (req, res) => {
   try {
-    const skills = db.prepare('SELECT name FROM skills WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
-    const interests = db.prepare('SELECT name FROM interests WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
-    const goals = db.prepare('SELECT name FROM connection_goals WHERE is_active = 1 ORDER BY name ASC').all().map(r => r.name);
+    const skills = (await db.prepare('SELECT name FROM skills WHERE is_active = 1 ORDER BY name ASC').all()).map(r => r.name);
+    const interests = (await db.prepare('SELECT name FROM interests WHERE is_active = 1 ORDER BY name ASC').all()).map(r => r.name);
+    const goals = (await db.prepare('SELECT name FROM connection_goals WHERE is_active = 1 ORDER BY name ASC').all()).map(r => r.name);
 
     res.json({
       skills,
@@ -379,9 +384,9 @@ app.get(['/api/profile-options', '/api/profile/options'], (req, res) => {
 // -------------------------------------------------------------
 // 7. Get Current User Profile (GET /api/profiles/me)
 // -------------------------------------------------------------
-app.get(['/api/profiles/me', '/api/profile/me'], authMiddleware, (req, res) => {
+app.get(['/api/profiles/me', '/api/profile/me'], authMiddleware, async (req, res) => {
   try {
-    const profile = getUserProfile(req.user.id);
+    const profile = await getUserProfile(req.user.id);
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
@@ -394,120 +399,118 @@ app.get(['/api/profiles/me', '/api/profile/me'], authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 8. Update Current User Profile (PATCH / PUT /api/profiles/me)
 // -------------------------------------------------------------
-function handleUpdateProfile(req, res) {
+async function handleUpdateProfile(req, res) {
   try {
     const { displayName, bio, skills, interests, goals } = req.body;
 
-    // Validate displayName if supplied
     if (displayName !== undefined) {
       if (typeof displayName !== 'string') {
         return res.status(400).json({ error: 'Display name must be a string' });
       }
       const trimmed = displayName.trim();
-      if (trimmed.length < 2 || trimmed.length > 80) {
-        return res.status(400).json({ error: 'Display name must be between 2 and 80 characters long' });
+      if (trimmed.length < 2 || trimmed.length > 50) {
+        return res.status(400).json({ error: 'Display name must be between 2 and 50 characters' });
       }
     }
 
-    // Validate bio if supplied
     if (bio !== undefined) {
       if (typeof bio !== 'string') {
         return res.status(400).json({ error: 'Bio must be a string' });
       }
-      if (bio.length > 500) {
+      if (bio.trim().length > 500) {
         return res.status(400).json({ error: 'Bio cannot exceed 500 characters' });
       }
     }
 
-    // Validate skills if supplied
     const validSkillIds = [];
     if (skills !== undefined) {
       if (!Array.isArray(skills)) {
         return res.status(400).json({ error: 'Skills must be an array' });
       }
       for (const item of skills) {
-        const found = db.prepare('SELECT id FROM skills WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (typeof item !== 'string' || !item.trim()) continue;
+        const found = await db.prepare('SELECT id FROM skills WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
         if (!found) {
-          return res.status(400).json({ error: `Invalid skill selection: ${item}` });
+          return res.status(400).json({ error: `Invalid or inactive skill: ${item}` });
         }
-        validSkillIds.push(found.id);
+        if (!validSkillIds.includes(found.id)) validSkillIds.push(found.id);
       }
     }
 
-    // Validate interests if supplied
     const validInterestIds = [];
     if (interests !== undefined) {
       if (!Array.isArray(interests)) {
         return res.status(400).json({ error: 'Interests must be an array' });
       }
       for (const item of interests) {
-        const found = db.prepare('SELECT id FROM interests WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (typeof item !== 'string' || !item.trim()) continue;
+        const found = await db.prepare('SELECT id FROM interests WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
         if (!found) {
-          return res.status(400).json({ error: `Invalid interest selection: ${item}` });
+          return res.status(400).json({ error: `Invalid or inactive interest: ${item}` });
         }
-        validInterestIds.push(found.id);
+        if (!validInterestIds.includes(found.id)) validInterestIds.push(found.id);
       }
     }
 
-    // Validate goals if supplied
     const validGoalIds = [];
     if (goals !== undefined) {
       if (!Array.isArray(goals)) {
         return res.status(400).json({ error: 'Goals must be an array' });
       }
       for (const item of goals) {
-        const found = db.prepare('SELECT id FROM connection_goals WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
+        if (typeof item !== 'string' || !item.trim()) continue;
+        const found = await db.prepare('SELECT id FROM connection_goals WHERE is_active = 1 AND (LOWER(name) = LOWER(?) OR id = ?)').get(item, item);
         if (!found) {
-          return res.status(400).json({ error: `Invalid connection goal selection: ${item}` });
+          return res.status(400).json({ error: `Invalid or inactive connection goal: ${item}` });
         }
-        validGoalIds.push(found.id);
+        if (!validGoalIds.includes(found.id)) validGoalIds.push(found.id);
       }
     }
 
     // Atomic transaction for updates
-    const updateTx = db.transaction(() => {
+    const updateTx = db.transaction(async () => {
       if (displayName !== undefined) {
-        db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(displayName.trim(), req.user.id);
+        await db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(displayName.trim(), req.user.id);
       }
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO profiles (user_id, bio, photo_url)
         VALUES (?, '', NULL)
         ON CONFLICT(user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
       `).run(req.user.id);
 
       if (bio !== undefined) {
-        db.prepare('UPDATE profiles SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?').run(bio.trim(), req.user.id);
+        await db.prepare('UPDATE profiles SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?').run(bio.trim(), req.user.id);
       }
 
       if (skills !== undefined) {
-        db.prepare('DELETE FROM profile_skills WHERE user_id = ?').run(req.user.id);
+        await db.prepare('DELETE FROM profile_skills WHERE user_id = ?').run(req.user.id);
         const insertSkill = db.prepare('INSERT OR IGNORE INTO profile_skills (user_id, skill_id) VALUES (?, ?)');
         for (const sId of validSkillIds) {
-          insertSkill.run(req.user.id, sId);
+          await insertSkill.run(req.user.id, sId);
         }
       }
 
       if (interests !== undefined) {
-        db.prepare('DELETE FROM profile_interests WHERE user_id = ?').run(req.user.id);
+        await db.prepare('DELETE FROM profile_interests WHERE user_id = ?').run(req.user.id);
         const insertInterest = db.prepare('INSERT OR IGNORE INTO profile_interests (user_id, interest_id) VALUES (?, ?)');
         for (const iId of validInterestIds) {
-          insertInterest.run(req.user.id, iId);
+          await insertInterest.run(req.user.id, iId);
         }
       }
 
       if (goals !== undefined) {
-        db.prepare('DELETE FROM profile_goals WHERE user_id = ?').run(req.user.id);
+        await db.prepare('DELETE FROM profile_goals WHERE user_id = ?').run(req.user.id);
         const insertGoal = db.prepare('INSERT OR IGNORE INTO profile_goals (user_id, goal_id) VALUES (?, ?)');
         for (const gId of validGoalIds) {
-          insertGoal.run(req.user.id, gId);
+          await insertGoal.run(req.user.id, gId);
         }
       }
     });
 
-    updateTx();
+    await updateTx();
 
-    const profile = getUserProfile(req.user.id);
+    const profile = await getUserProfile(req.user.id);
     res.json(profile);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update profile' });
@@ -520,31 +523,38 @@ app.put(['/api/profiles/me', '/api/profile/me'], authMiddleware, handleUpdatePro
 // -------------------------------------------------------------
 // 9. Upload Profile Photo (POST /api/profiles/me/photo)
 // -------------------------------------------------------------
-app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, photoUploadMiddleware, (req, res) => {
+app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, photoUploadMiddleware, async (req, res) => {
   try {
-    // Delete previous file if exists
-    const prevProfile = db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
-    if (prevProfile && prevProfile.photo_url && prevProfile.photo_url.startsWith('/uploads/')) {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    const prevProfile = await db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
+    if (prevProfile && prevProfile.photo_url) {
       const prevFilename = path.basename(prevProfile.photo_url);
-      const prevPath = path.join(uploadsDir, prevFilename);
-      if (fs.existsSync(prevPath)) {
+      const prevFilePath = path.join(uploadsDir, prevFilename);
+      if (fs.existsSync(prevFilePath)) {
         try {
-          fs.unlinkSync(prevPath);
-        } catch (e) {}
+          fs.unlinkSync(prevFilePath);
+        } catch (e) {
+          // ignore unlink error
+        }
       }
     }
 
     const photoUrl = `/uploads/${req.file.filename}`;
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO profiles (user_id, bio, photo_url)
       VALUES (?, '', ?)
-      ON CONFLICT(user_id) DO UPDATE SET photo_url = excluded.photo_url, updated_at = CURRENT_TIMESTAMP
-    `).run(req.user.id, photoUrl);
+      ON CONFLICT(user_id) DO UPDATE SET photo_url = ?, updated_at = CURRENT_TIMESTAMP
+    `).run(req.user.id, photoUrl, photoUrl);
 
+    const profile = await getUserProfile(req.user.id);
     res.json({
+      message: 'Photo uploaded successfully',
       photoUrl,
-      message: 'Photo uploaded successfully'
+      profile
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to upload photo' });
@@ -554,20 +564,22 @@ app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, ph
 // -------------------------------------------------------------
 // 10. Delete Profile Photo (DELETE /api/profiles/me/photo)
 // -------------------------------------------------------------
-app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, (req, res) => {
+app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, async (req, res) => {
   try {
-    const profile = db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
-    if (profile && profile.photo_url && profile.photo_url.startsWith('/uploads/')) {
+    const profile = await db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
+    if (profile && profile.photo_url) {
       const filename = path.basename(profile.photo_url);
       const filePath = path.join(uploadsDir, filename);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
-        } catch (e) {}
+        } catch (e) {
+          // ignore unlink error
+        }
       }
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE profiles 
       SET photo_url = NULL, updated_at = CURRENT_TIMESTAMP 
       WHERE user_id = ?
@@ -582,27 +594,24 @@ app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, 
   }
 });
 
-// -------------------------------------------------------------
-// 11. Discovery: Search and Explainable Fit (GET /api/profiles)
-// -------------------------------------------------------------
+// =============================================================
+// FR-03: SEARCH & DISCOVERY (DISCOVER PEERS & EXPLAINABLE FIT)
+// =============================================================
 
-// Helper to normalize course IDs
 function normalizeCourseId(courseId) {
   if (!courseId) return '';
-  const map = {
-    'software-development': 'software-dev',
-    'business-development': 'business-dev'
-  };
-  return map[courseId.toLowerCase()] || courseId.toLowerCase();
+  return courseId.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Helper to parse query parameters that may be an array or comma-separated string
 function parseListParam(param) {
   if (!param) return [];
   if (Array.isArray(param)) {
-    return param.map(s => String(s).trim()).filter(Boolean);
+    return param.map(item => String(item).trim().toLowerCase()).filter(Boolean);
   }
-  return String(param).split(',').map(s => s.trim()).filter(Boolean);
+  return String(param)
+    .split(',')
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 // Calculate evidence-based fit reasons between candidate and viewer
@@ -648,27 +657,29 @@ function calculateFitReasons(candidate, viewer) {
   return reasons;
 }
 
-// Search and filter community profiles (Discovery)
-app.get('/api/profiles', authMiddleware, (req, res) => {
+// -------------------------------------------------------------
+// 11. Search & Filter Profiles with Explainable Fit (GET /api/profiles)
+// -------------------------------------------------------------
+app.get('/api/profiles', authMiddleware, async (req, res) => {
   try {
-    const viewer = getUserProfile(req.user.id);
+    const viewer = await getUserProfile(req.user.id);
     if (!viewer) {
-      return res.status(401).json({ error: 'Viewer profile not found' });
+      return res.status(404).json({ error: 'Viewer profile not found' });
     }
-
-    // Parse filtering parameters
-    const query = (req.query.query || '').trim().toLowerCase();
-    const courseFilter = normalizeCourseId(req.query.courseId);
-    const skillsFilter = parseListParam(req.query.skills).map(s => s.toLowerCase());
-    const interestsFilter = parseListParam(req.query.interests).map(s => s.toLowerCase());
-    const goalsFilter = parseListParam(req.query.goals).map(s => s.toLowerCase());
 
     // Pagination parameters
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.max(1, parseInt(req.query.limit, 10) || 12);
 
+    // Parse filtering parameters
+    const query = (req.query.query || '').trim().toLowerCase();
+    const courseFilter = normalizeCourseId(req.query.courseId || req.query.course);
+    const skillsFilter = parseListParam(req.query.skills).map(s => s.toLowerCase());
+    const interestsFilter = parseListParam(req.query.interests).map(s => s.toLowerCase());
+    const goalsFilter = parseListParam(req.query.goals).map(s => s.toLowerCase());
+
     // Fetch active candidates, strictly excluding current user and suspended accounts
-    const candidateRows = db.prepare(`
+    const candidateRows = await db.prepare(`
       SELECT users.id 
       FROM users 
       WHERE users.status = 'active' AND users.id != ?
@@ -678,7 +689,7 @@ app.get('/api/profiles', authMiddleware, (req, res) => {
     // Hydrate candidates and apply filters
     const matched = [];
     for (const row of candidateRows) {
-      const candidate = getUserProfile(row.id);
+      const candidate = await getUserProfile(row.id);
       if (!candidate) continue;
 
       // Filter: Text search query across name, bio, skills, and interests
@@ -749,7 +760,7 @@ app.get('/api/profiles', authMiddleware, (req, res) => {
 
     // Apply pagination
     const total = matched.length;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / limit) || 1;
     const startIndex = (page - 1) * limit;
     const paginatedProfiles = matched.slice(startIndex, startIndex + limit);
 
@@ -763,16 +774,16 @@ app.get('/api/profiles', authMiddleware, (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve community profiles' });
+    res.status(500).json({ error: 'Failed to search profiles' });
   }
 });
 
 // -------------------------------------------------------------
-// 12. View Public Profile of Another User (GET /api/profiles/:userId)
+// 12. View Candidate Profile Detail (GET /api/profiles/:userId)
 // -------------------------------------------------------------
-app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req, res) => {
+app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, async (req, res) => {
   try {
-    const targetUser = db.prepare('SELECT id, status FROM users WHERE id = ?').get(req.params.userId);
+    const targetUser = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(req.params.userId);
     if (!targetUser) {
       return res.status(404).json({ error: 'User profile not found' });
     }
@@ -781,11 +792,15 @@ app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req,
       return res.status(403).json({ error: 'This profile is unavailable' });
     }
 
-    const candidate = getUserProfile(req.params.userId);
-    const viewer = getUserProfile(req.user.id);
+    const candidate = await getUserProfile(req.params.userId);
+    const viewer = await getUserProfile(req.user.id);
+
+    if (!candidate || !viewer) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
     const fitReasons = calculateFitReasons(candidate, viewer);
 
-    // Explicitly exclude email, password_hash, role, and private account fields
     res.json({
       id: candidate.id,
       displayName: candidate.displayName,
@@ -799,22 +814,20 @@ app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, (req,
       fitReasons
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to retrieve profile' });
+    res.status(500).json({ error: 'Failed to retrieve profile details' });
   }
 });
 
-// -------------------------------------------------------------
-// Helper functions for 1-on-1 Private Messaging (FR-04)
-// -------------------------------------------------------------
+// =============================================================
+// FR-04: DIRECT 1-ON-1 PRIVATE MESSAGING & CONVERSATIONS
+// =============================================================
 
-// Helper to canonically order two participant IDs to prevent duplicate conversations
 function canonicalizeParticipants(userA, userB) {
   return userA < userB ? [userA, userB] : [userB, userA];
 }
 
-// Helper to retrieve public summary of a user (excluding email, password_hash, role)
-function getPublicUserSummary(userId) {
-  const row = db.prepare(`
+async function getPublicUserSummary(userId) {
+  const row = await db.prepare(`
     SELECT 
       users.id, 
       users.display_name, 
@@ -837,30 +850,28 @@ function getPublicUserSummary(userId) {
   };
 }
 
-// Helper to get unread messages count in a conversation for a specific user
-function getUnreadCount(conversationId, userId) {
-  const readRecord = db.prepare(`
+async function getUnreadCount(conversationId, userId) {
+  const readRecord = await db.prepare(`
     SELECT last_read_at FROM conversation_reads 
     WHERE conversation_id = ? AND user_id = ?
   `).get(conversationId, userId);
 
   const lastReadAt = readRecord ? readRecord.last_read_at : '1970-01-01T00:00:00.000Z';
 
-  const countRow = db.prepare(`
+  const countRow = await db.prepare(`
     SELECT COUNT(*) AS count FROM messages 
     WHERE conversation_id = ? AND sender_id != ? AND created_at > ?
   `).get(conversationId, userId, lastReadAt);
 
-  return countRow ? countRow.count : 0;
+  return countRow ? Number(countRow.count) : 0;
 }
 
-// Helper to get latest message preview in a conversation
-function getLastMessage(conversationId) {
-  const msg = db.prepare(`
+async function getLastMessage(conversationId) {
+  const msg = await db.prepare(`
     SELECT id, conversation_id, sender_id, text, created_at 
     FROM messages 
     WHERE conversation_id = ? 
-    ORDER BY created_at DESC, rowid DESC 
+    ORDER BY created_at DESC, id DESC 
     LIMIT 1
   `).get(conversationId);
 
@@ -874,12 +885,11 @@ function getLastMessage(conversationId) {
   };
 }
 
-// Helper to format conversation with participant details, last message, and unread count
-function formatConversation(conv, currentUserId) {
+async function formatConversation(conv, currentUserId) {
   const otherUserId = conv.participant1_id === currentUserId ? conv.participant2_id : conv.participant1_id;
-  const otherUser = getPublicUserSummary(otherUserId);
-  const lastMessage = getLastMessage(conv.id);
-  const unreadCount = getUnreadCount(conv.id, currentUserId);
+  const otherUser = await getPublicUserSummary(otherUserId);
+  const lastMessage = await getLastMessage(conv.id);
+  const unreadCount = await getUnreadCount(conv.id, currentUserId);
 
   return {
     id: conv.id,
@@ -898,17 +908,17 @@ function formatConversation(conv, currentUserId) {
 // -------------------------------------------------------------
 // 13. Get Conversations List / Inbox (GET /api/conversations)
 // -------------------------------------------------------------
-app.get('/api/conversations', authMiddleware, (req, res) => {
+app.get('/api/conversations', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT id, participant1_id, participant2_id, created_at, updated_at
       FROM conversations
       WHERE participant1_id = ? OR participant2_id = ?
       ORDER BY updated_at DESC
     `).all(currentUserId, currentUserId);
 
-    const conversations = rows.map(conv => formatConversation(conv, currentUserId));
+    const conversations = await Promise.all(rows.map(conv => formatConversation(conv, currentUserId)));
 
     res.json({ conversations });
   } catch (error) {
@@ -919,7 +929,7 @@ app.get('/api/conversations', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 14. Start or Reuse Conversation (POST /api/conversations)
 // -------------------------------------------------------------
-app.post('/api/conversations', authMiddleware, (req, res) => {
+app.post('/api/conversations', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
     const recipientId = req.body.recipientId || req.body.personId;
@@ -932,7 +942,7 @@ app.post('/api/conversations', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'Cannot start conversation with yourself' });
     }
 
-    const recipient = db.prepare('SELECT id, status FROM users WHERE id = ?').get(recipientId);
+    const recipient = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(recipientId);
     if (!recipient) {
       return res.status(404).json({ error: 'Recipient user not found' });
     }
@@ -942,7 +952,7 @@ app.post('/api/conversations', authMiddleware, (req, res) => {
     }
 
     const [p1, p2] = canonicalizeParticipants(currentUserId, recipientId);
-    let conversation = db.prepare(`
+    let conversation = await db.prepare(`
       SELECT id, participant1_id, participant2_id, created_at, updated_at
       FROM conversations
       WHERE participant1_id = ? AND participant2_id = ?
@@ -953,12 +963,12 @@ app.post('/api/conversations', authMiddleware, (req, res) => {
 
     if (!conversation) {
       const convId = crypto.randomUUID();
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO conversations (id, participant1_id, participant2_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
       `).run(convId, p1, p2, now, now);
 
-      conversation = db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(convId);
+      conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(convId);
       isNew = true;
     }
 
@@ -975,23 +985,23 @@ app.post('/api/conversations', authMiddleware, (req, res) => {
       const msgId = crypto.randomUUID();
       const msgTime = new Date().toISOString();
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
         VALUES (?, ?, ?, ?, ?)
       `).run(msgId, conversation.id, currentUserId, trimmed, msgTime);
 
-      db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(msgTime, conversation.id);
+      await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(msgTime, conversation.id);
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
         VALUES (?, ?, ?)
         ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
       `).run(conversation.id, currentUserId, msgTime, msgTime);
 
-      conversation = db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(conversation.id);
+      conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(conversation.id);
     }
 
-    const formatted = formatConversation(conversation, currentUserId);
+    const formatted = await formatConversation(conversation, currentUserId);
     res.status(isNew ? 201 : 200).json({ conversation: formatted });
   } catch (error) {
     res.status(500).json({ error: 'Failed to start or retrieve conversation' });
@@ -1001,10 +1011,10 @@ app.post('/api/conversations', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 15. Get Single Conversation Detail (GET /api/conversations/:id)
 // -------------------------------------------------------------
-app.get('/api/conversations/:id', authMiddleware, (req, res) => {
+app.get('/api/conversations/:id', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+    const conversation = await db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -1014,7 +1024,7 @@ app.get('/api/conversations/:id', authMiddleware, (req, res) => {
       return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
     }
 
-    const formatted = formatConversation(conversation, currentUserId);
+    const formatted = await formatConversation(conversation, currentUserId);
     res.json({ conversation: formatted });
   } catch (error) {
     res.status(500).json({ error: 'Failed to retrieve conversation' });
@@ -1024,10 +1034,10 @@ app.get('/api/conversations/:id', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 16. Get Messages History (GET /api/conversations/:id/messages)
 // -------------------------------------------------------------
-app.get('/api/conversations/:id/messages', authMiddleware, (req, res) => {
+app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+    const conversation = await db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -1040,16 +1050,16 @@ app.get('/api/conversations/:id/messages', authMiddleware, (req, res) => {
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
 
-    const rows = db.prepare(`
+    const rows = await db.prepare(`
       SELECT id, conversation_id, sender_id, text, created_at
       FROM messages
       WHERE conversation_id = ?
-      ORDER BY created_at ASC, rowid ASC
+      ORDER BY created_at ASC, id ASC
       LIMIT ?
     `).all(conversation.id, limit);
 
     const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
-    const otherUser = getPublicUserSummary(otherUserId);
+    const otherUser = await getPublicUserSummary(otherUserId);
 
     res.json({
       conversationId: conversation.id,
@@ -1075,10 +1085,10 @@ app.get('/api/conversations/:id/messages', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 17. Send Message in Conversation (POST /api/conversations/:id/messages)
 // -------------------------------------------------------------
-app.post('/api/conversations/:id/messages', authMiddleware, (req, res) => {
+app.post('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+    const conversation = await db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -1091,7 +1101,7 @@ app.post('/api/conversations/:id/messages', authMiddleware, (req, res) => {
 
     // Check if recipient is suspended
     const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
-    const recipient = db.prepare('SELECT id, status FROM users WHERE id = ?').get(otherUserId);
+    const recipient = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(otherUserId);
 
     if (recipient && recipient.status === 'suspended') {
       return res.status(403).json({ error: 'Recipient account is suspended and cannot receive messages' });
@@ -1110,15 +1120,15 @@ app.post('/api/conversations/:id/messages', authMiddleware, (req, res) => {
     const msgId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
       VALUES (?, ?, ?, ?, ?)
     `).run(msgId, conversation.id, currentUserId, trimmed, now);
 
-    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversation.id);
+    await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversation.id);
 
     // Update sender's read timestamp so their own message is not counted as unread
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
       VALUES (?, ?, ?)
       ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
@@ -1139,10 +1149,10 @@ app.post('/api/conversations/:id/messages', authMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 18. Mark Conversation as Read (POST /api/conversations/:id/read)
 // -------------------------------------------------------------
-app.post('/api/conversations/:id/read', authMiddleware, (req, res) => {
+app.post('/api/conversations/:id/read', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
+    const conversation = await db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
 
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -1154,7 +1164,7 @@ app.post('/api/conversations/:id/read', authMiddleware, (req, res) => {
     }
 
     const now = new Date().toISOString();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
       VALUES (?, ?, ?)
       ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
@@ -1182,13 +1192,11 @@ function adminMiddleware(req, res, next) {
   });
 }
 
-// Helper to normalize names: trim and collapse internal repeated whitespaces
 function normalizeName(name) {
   if (typeof name !== 'string') return '';
   return name.trim().replace(/\s+/g, ' ');
 }
 
-// Managed list tables configuration
 const ADMIN_MANAGED_TABLES = {
   categories: { table: 'categories', hasCategory: false },
   skills: { table: 'skills', hasCategory: true },
@@ -1199,42 +1207,42 @@ const ADMIN_MANAGED_TABLES = {
 // -------------------------------------------------------------
 // 19. Administrator Workspace Data (GET /api/admin/workspace & /api/admin/load)
 // -------------------------------------------------------------
-app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, (req, res) => {
+app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, async (req, res) => {
   try {
-    const categories = db.prepare('SELECT id, name, is_active FROM categories ORDER BY name ASC').all().map(c => ({
+    const categories = (await db.prepare('SELECT id, name, is_active FROM categories ORDER BY name ASC').all()).map(c => ({
       id: c.id,
       name: c.name,
       active: Boolean(c.is_active)
     }));
 
-    const skills = db.prepare('SELECT id, name, category_id, is_active FROM skills ORDER BY name ASC').all().map(s => ({
+    const skills = (await db.prepare('SELECT id, name, category_id, is_active FROM skills ORDER BY name ASC').all()).map(s => ({
       id: s.id,
       name: s.name,
       categoryId: s.category_id || '',
       active: Boolean(s.is_active)
     }));
 
-    const interests = db.prepare('SELECT id, name, category_id, is_active FROM interests ORDER BY name ASC').all().map(i => ({
+    const interests = (await db.prepare('SELECT id, name, category_id, is_active FROM interests ORDER BY name ASC').all()).map(i => ({
       id: i.id,
       name: i.name,
       categoryId: i.category_id || '',
       active: Boolean(i.is_active)
     }));
 
-    const courses = db.prepare('SELECT id, name, is_active FROM courses ORDER BY name ASC').all().map(c => ({
+    const courses = (await db.prepare('SELECT id, name, is_active FROM courses ORDER BY name ASC').all()).map(c => ({
       id: c.id,
       name: c.name,
       active: Boolean(c.is_active)
     }));
 
-    const usersRows = db.prepare(`
+    const usersRows = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
         users.email, 
         users.course_id, 
         users.role, 
-        users.status,
+        users.status, 
         courses.name AS course_name,
         profiles.bio,
         profiles.photo_url
@@ -1244,27 +1252,27 @@ app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, (req, res)
       ORDER BY users.display_name ASC
     `).all();
 
-    const users = usersRows.map(u => {
-      const userSkills = db.prepare(`
+    const users = await Promise.all(usersRows.map(async (u) => {
+      const userSkills = (await db.prepare(`
         SELECT skills.name FROM profile_skills
         JOIN skills ON profile_skills.skill_id = skills.id
         WHERE profile_skills.user_id = ?
         ORDER BY skills.name ASC
-      `).all(u.id).map(r => r.name);
+      `).all(u.id)).map(r => r.name);
 
-      const userInterests = db.prepare(`
+      const userInterests = (await db.prepare(`
         SELECT interests.name FROM profile_interests
         JOIN interests ON profile_interests.interest_id = interests.id
         WHERE profile_interests.user_id = ?
         ORDER BY interests.name ASC
-      `).all(u.id).map(r => r.name);
+      `).all(u.id)).map(r => r.name);
 
-      const userGoals = db.prepare(`
+      const userGoals = (await db.prepare(`
         SELECT connection_goals.name FROM profile_goals
         JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
         WHERE profile_goals.user_id = ?
         ORDER BY connection_goals.name ASC
-      `).all(u.id).map(r => r.name);
+      `).all(u.id)).map(r => r.name);
 
       return {
         id: u.id,
@@ -1280,7 +1288,7 @@ app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, (req, res)
         interests: userInterests,
         goals: userGoals
       };
-    });
+    }));
 
     res.json({
       categories,
@@ -1297,19 +1305,19 @@ app.get(['/api/admin/workspace', '/api/admin/load'], adminMiddleware, (req, res)
 // -------------------------------------------------------------
 // 20. Administrator Users List (GET /api/admin/users)
 // -------------------------------------------------------------
-app.get('/api/admin/users', adminMiddleware, (req, res) => {
+app.get('/api/admin/users', adminMiddleware, async (req, res) => {
   try {
     const query = (req.query.query || '').trim().toLowerCase();
     const statusFilter = req.query.status || 'all';
 
-    const usersRows = db.prepare(`
+    const usersRows = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
         users.email, 
         users.course_id, 
         users.role, 
-        users.status,
+        users.status, 
         courses.name AS course_name,
         profiles.bio,
         profiles.photo_url
@@ -1327,20 +1335,20 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
       return matchQuery && matchStatus;
     });
 
-    const users = filtered.map(u => {
-      const userSkills = db.prepare(`
+    const users = await Promise.all(filtered.map(async (u) => {
+      const userSkills = (await db.prepare(`
         SELECT skills.name FROM profile_skills
         JOIN skills ON profile_skills.skill_id = skills.id
         WHERE profile_skills.user_id = ?
         ORDER BY skills.name ASC
-      `).all(u.id).map(r => r.name);
+      `).all(u.id)).map(r => r.name);
 
-      const userInterests = db.prepare(`
+      const userInterests = (await db.prepare(`
         SELECT interests.name FROM profile_interests
         JOIN interests ON profile_interests.interest_id = interests.id
         WHERE profile_interests.user_id = ?
         ORDER BY interests.name ASC
-      `).all(u.id).map(r => r.name);
+      `).all(u.id)).map(r => r.name);
 
       return {
         id: u.id,
@@ -1355,7 +1363,7 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
         skills: userSkills,
         interests: userInterests
       };
-    });
+    }));
 
     res.json({ users });
   } catch (error) {
@@ -1366,16 +1374,16 @@ app.get('/api/admin/users', adminMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 21. Administrator User Inspection Detail (GET /api/admin/users/:id)
 // -------------------------------------------------------------
-app.get('/api/admin/users/:id', adminMiddleware, (req, res) => {
+app.get('/api/admin/users/:id', adminMiddleware, async (req, res) => {
   try {
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
         users.email, 
         users.course_id, 
         users.role, 
-        users.status,
+        users.status, 
         courses.name AS course_name,
         profiles.bio,
         profiles.photo_url
@@ -1389,26 +1397,26 @@ app.get('/api/admin/users/:id', adminMiddleware, (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const skills = db.prepare(`
+    const skills = (await db.prepare(`
       SELECT skills.name FROM profile_skills
       JOIN skills ON profile_skills.skill_id = skills.id
       WHERE profile_skills.user_id = ?
       ORDER BY skills.name ASC
-    `).all(user.id).map(r => r.name);
+    `).all(user.id)).map(r => r.name);
 
-    const interests = db.prepare(`
+    const interests = (await db.prepare(`
       SELECT interests.name FROM profile_interests
       JOIN interests ON profile_interests.interest_id = interests.id
       WHERE profile_interests.user_id = ?
       ORDER BY interests.name ASC
-    `).all(user.id).map(r => r.name);
+    `).all(user.id)).map(r => r.name);
 
-    const goals = db.prepare(`
+    const goals = (await db.prepare(`
       SELECT connection_goals.name FROM profile_goals
       JOIN connection_goals ON profile_goals.goal_id = connection_goals.id
       WHERE profile_goals.user_id = ?
       ORDER BY connection_goals.name ASC
-    `).all(user.id).map(r => r.name);
+    `).all(user.id)).map(r => r.name);
 
     // Explicitly exclude private messages to guarantee privacy
     res.json({
@@ -1433,9 +1441,9 @@ app.get('/api/admin/users/:id', adminMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 22. Administrator User Moderation / Suspension (PATCH /api/admin/users/:id)
 // -------------------------------------------------------------
-app.patch('/api/admin/users/:id', adminMiddleware, (req, res) => {
+app.patch('/api/admin/users/:id', adminMiddleware, async (req, res) => {
   try {
-    const user = db.prepare('SELECT id, course_id, status FROM users WHERE id = ?').get(req.params.id);
+    const user = await db.prepare('SELECT id, course_id, status FROM users WHERE id = ?').get(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'This user is unavailable' });
     }
@@ -1447,7 +1455,7 @@ app.patch('/api/admin/users/:id', adminMiddleware, (req, res) => {
 
     // Validate course assignment correction
     if (courseId !== undefined && courseId !== user.course_id) {
-      const activeCourse = db.prepare('SELECT id FROM courses WHERE id = ? AND is_active = 1').get(courseId);
+      const activeCourse = await db.prepare('SELECT id FROM courses WHERE id = ? AND is_active = 1').get(courseId);
       if (!activeCourse) {
         return res.status(400).json({ error: 'Choose an active course' });
       }
@@ -1463,21 +1471,21 @@ app.patch('/api/admin/users/:id', adminMiddleware, (req, res) => {
 
       // Acceptance Criterion 7: Suspension revokes access immediately
       if (status === 'suspended') {
-        const result = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+        const result = await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
         revokedSessions = result.changes;
       }
     }
 
-    db.prepare('UPDATE users SET course_id = ?, status = ? WHERE id = ?').run(updatedCourseId, updatedStatus, user.id);
+    await db.prepare('UPDATE users SET course_id = ?, status = ? WHERE id = ?').run(updatedCourseId, updatedStatus, user.id);
 
-    const updatedUser = db.prepare(`
+    const updatedUser = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
         users.email, 
         users.course_id, 
         users.role, 
-        users.status,
+        users.status, 
         courses.name AS course_name
       FROM users
       JOIN courses ON users.course_id = courses.id
@@ -1500,14 +1508,14 @@ app.patch('/api/admin/users/:id', adminMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 23. List Managed Records (GET /api/admin/:kind)
 // -------------------------------------------------------------
-app.get('/api/admin/:kind', adminMiddleware, (req, res) => {
+app.get('/api/admin/:kind', adminMiddleware, async (req, res) => {
   try {
     const config = ADMIN_MANAGED_TABLES[req.params.kind];
     if (!config) {
       return res.status(404).json({ error: 'Unknown managed list' });
     }
 
-    const rows = db.prepare(`SELECT * FROM ${config.table} ORDER BY name ASC`).all();
+    const rows = await db.prepare(`SELECT * FROM ${config.table} ORDER BY name ASC`).all();
     const records = rows.map(r => {
       const item = {
         id: r.id,
@@ -1529,7 +1537,7 @@ app.get('/api/admin/:kind', adminMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 24. Create Managed Record (POST /api/admin/:kind)
 // -------------------------------------------------------------
-app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
+app.post('/api/admin/:kind', adminMiddleware, async (req, res) => {
   try {
     const config = ADMIN_MANAGED_TABLES[req.params.kind];
     if (!config) {
@@ -1544,7 +1552,7 @@ app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
     }
 
     // Duplicate check across existing names in this managed list (case-insensitive)
-    const duplicate = db.prepare(`SELECT id FROM ${config.table} WHERE LOWER(name) = LOWER(?)`).get(normalized);
+    const duplicate = await db.prepare(`SELECT id FROM ${config.table} WHERE LOWER(name) = LOWER(?)`).get(normalized);
     if (duplicate) {
       return res.status(409).json({ error: 'This name already exists in this list' });
     }
@@ -1552,7 +1560,7 @@ app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
     // Category association validation for skills and interests
     let validCategoryId = null;
     if (config.hasCategory && categoryId) {
-      const cat = db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
+      const cat = await db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
       if (!cat || !cat.is_active) {
         return res.status(400).json({ error: 'Choose an active category' });
       }
@@ -1561,17 +1569,18 @@ app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
 
     // Generate unique ID
     let newId = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    if (!newId || db.prepare(`SELECT id FROM ${config.table} WHERE id = ?`).get(newId)) {
+    const idTaken = await db.prepare(`SELECT id FROM ${config.table} WHERE id = ?`).get(newId);
+    if (!newId || idTaken) {
       newId = `${newId || req.params.kind.slice(0, -1)}-${crypto.randomUUID().slice(0, 8)}`;
     }
 
     if (config.hasCategory) {
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO ${config.table} (id, name, category_id, is_active)
         VALUES (?, ?, ?, 1)
       `).run(newId, normalized, validCategoryId);
     } else {
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO ${config.table} (id, name, is_active)
         VALUES (?, ?, 1)
       `).run(newId, normalized);
@@ -1595,14 +1604,14 @@ app.post('/api/admin/:kind', adminMiddleware, (req, res) => {
 // -------------------------------------------------------------
 // 25. Update or Deactivate Managed Record (PATCH /api/admin/:kind/:id)
 // -------------------------------------------------------------
-app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
+app.patch('/api/admin/:kind/:id', adminMiddleware, async (req, res) => {
   try {
     const config = ADMIN_MANAGED_TABLES[req.params.kind];
     if (!config) {
       return res.status(404).json({ error: 'Unknown managed list' });
     }
 
-    const record = db.prepare(`SELECT * FROM ${config.table} WHERE id = ?`).get(req.params.id);
+    const record = await db.prepare(`SELECT * FROM ${config.table} WHERE id = ?`).get(req.params.id);
     if (!record) {
       return res.status(404).json({ error: 'This record is unavailable' });
     }
@@ -1617,7 +1626,7 @@ app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
       if (!normalized || normalized.length > 80) {
         return res.status(400).json({ error: 'Enter a name between 1 and 80 characters' });
       }
-      const duplicate = db.prepare(`
+      const duplicate = await db.prepare(`
         SELECT id FROM ${config.table} 
         WHERE LOWER(name) = LOWER(?) AND id != ?
       `).get(normalized, req.params.id);
@@ -1630,7 +1639,7 @@ app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
 
     if (config.hasCategory && categoryId !== undefined) {
       if (categoryId && categoryId !== record.category_id) {
-        const cat = db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
+        const cat = await db.prepare('SELECT id, is_active FROM categories WHERE id = ?').get(categoryId);
         if (!cat || !cat.is_active) {
           return res.status(400).json({ error: 'Choose an active category' });
         }
@@ -1647,13 +1656,13 @@ app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
     }
 
     if (config.hasCategory) {
-      db.prepare(`
+      await db.prepare(`
         UPDATE ${config.table}
         SET name = ?, category_id = ?, is_active = ?
         WHERE id = ?
       `).run(updatedName, updatedCategoryId, updatedActive, req.params.id);
     } else {
-      db.prepare(`
+      await db.prepare(`
         UPDATE ${config.table}
         SET name = ?, is_active = ?
         WHERE id = ?
@@ -1679,8 +1688,6 @@ app.patch('/api/admin/:kind/:id', adminMiddleware, (req, res) => {
 // FR-06: ACCOUNT SETTINGS
 // =============================================================
 
-// Rate limiting map for password verification
-// Key: userId, Value: { count: number, firstAttemptTime: number }
 const passwordAttemptLimiter = new Map();
 const MAX_PASSWORD_ATTEMPTS = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -1688,9 +1695,9 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 // -------------------------------------------------------------
 // 26. Get Account Settings (GET /api/account)
 // -------------------------------------------------------------
-app.get(['/api/account', '/api/account/settings'], authMiddleware, (req, res) => {
+app.get(['/api/account', '/api/account/settings'], authMiddleware, async (req, res) => {
   try {
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
@@ -1725,7 +1732,7 @@ app.get(['/api/account', '/api/account/settings'], authMiddleware, (req, res) =>
 // -------------------------------------------------------------
 // 27. Update Account Settings (PATCH / PUT /api/account)
 // -------------------------------------------------------------
-function handleUpdateAccount(req, res) {
+async function handleUpdateAccount(req, res) {
   try {
     const { displayName, courseId } = req.body;
 
@@ -1746,25 +1753,25 @@ function handleUpdateAccount(req, res) {
 
     let validCourse = undefined;
     if (courseId !== undefined) {
-      validCourse = db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
+      validCourse = await db.prepare('SELECT id, name FROM courses WHERE id = ? AND is_active = 1').get(courseId);
       if (!validCourse) {
         return res.status(400).json({ error: 'Choose an active course.' });
       }
     }
 
-    const updateTx = db.transaction(() => {
+    const updateTx = db.transaction(async () => {
       if (trimmedName !== undefined && validCourse !== undefined) {
-        db.prepare('UPDATE users SET display_name = ?, course_id = ? WHERE id = ?').run(trimmedName, validCourse.id, req.user.id);
+        await db.prepare('UPDATE users SET display_name = ?, course_id = ? WHERE id = ?').run(trimmedName, validCourse.id, req.user.id);
       } else if (trimmedName !== undefined) {
-        db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(trimmedName, req.user.id);
+        await db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(trimmedName, req.user.id);
       } else if (validCourse !== undefined) {
-        db.prepare('UPDATE users SET course_id = ? WHERE id = ?').run(validCourse.id, req.user.id);
+        await db.prepare('UPDATE users SET course_id = ? WHERE id = ?').run(validCourse.id, req.user.id);
       }
     });
 
-    updateTx();
+    await updateTx();
 
-    const updatedUser = db.prepare(`
+    const updatedUser = await db.prepare(`
       SELECT 
         users.id, 
         users.display_name, 
@@ -1798,7 +1805,7 @@ app.put(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateA
 // -------------------------------------------------------------
 // 28. Change Password with Reauthentication (POST /api/account/password)
 // -------------------------------------------------------------
-app.post('/api/account/password', authMiddleware, (req, res) => {
+app.post('/api/account/password', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const now = Date.now();
@@ -1820,7 +1827,7 @@ app.post('/api/account/password', authMiddleware, (req, res) => {
     }
 
     // Fetch user password hash
-    const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    const user = await db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
     if (!user) {
       return res.status(404).json({ error: 'User account not found' });
     }
@@ -1846,13 +1853,13 @@ app.post('/api/account/password', authMiddleware, (req, res) => {
     // Hash new password
     const newHash = bcrypt.hashSync(newPassword, 10);
 
-    const updatePasswordTx = db.transaction(() => {
-      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+    const updatePasswordTx = db.transaction(async () => {
+      await db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
       // Revoke all other active sessions while preserving current token
-      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, req.token);
+      await db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, req.token);
     });
 
-    updatePasswordTx();
+    await updatePasswordTx();
 
     // Reset rate limiter on success
     passwordAttemptLimiter.delete(userId);
