@@ -1,4 +1,5 @@
 const path = require('path');
+const { createPostgresSslOptions } = require('./postgres-ssl');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { AsyncLocalStorage } = require('async_hooks');
 
@@ -22,7 +23,11 @@ if (isPostgresClient) {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: true },
+    ssl: createPostgresSslOptions({
+      caPath: process.env.DATABASE_SSL_CA_PATH,
+      caPem: process.env.DATABASE_SSL_CA,
+      baseDir: __dirname,
+    }),
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000

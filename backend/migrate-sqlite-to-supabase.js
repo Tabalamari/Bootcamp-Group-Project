@@ -9,6 +9,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
+const { createPostgresSslOptions } = require('./postgres-ssl');
 
 const sqlitePath = process.env.DATABASE_PATH || path.join(__dirname, 'database.sqlite');
 const databaseUrl = process.env.DATABASE_URL;
@@ -73,7 +74,10 @@ async function main() {
   const sqlite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
   const pool = new Pool({
     connectionString: databaseUrl,
-    ssl: { rejectUnauthorized: true },
+    ssl: createPostgresSslOptions({
+      caPath: process.env.DATABASE_SSL_CA_PATH,
+      caPem: process.env.DATABASE_SSL_CA,
+    }),
     max: 1,
     connectionTimeoutMillis: 10000,
   });

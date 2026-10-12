@@ -14,6 +14,11 @@ process.env.NODE_ENV = 'test';
 process.env.DB_CLIENT = 'sqlite';
 delete process.env.DATABASE_URL;
 process.env.DATABASE_PATH = ':memory:';
+// dotenv must not restore Supabase credentials from a developer's local .env
+// when the API server is required below. Tests use local photo storage only.
+process.env.SUPABASE_URL = '';
+process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+process.env.SUPABASE_PROFILE_PHOTOS_BUCKET = '';
 const app = require('./server');
 const db = require('./db');
 

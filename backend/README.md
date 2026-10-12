@@ -33,7 +33,9 @@ SQLite development photos are served from `/uploads`. In production, configure `
 
 ### Supabase database and existing-data migration
 
-For a new Supabase project, apply `supabase-schema.sql` and then `supabase-seed.sql` in the Supabase SQL Editor. For an existing SQLite project, keep a backup of both `database.sqlite` and `uploads/`, set `DB_CLIENT=postgres` and `DATABASE_URL`, then run:
+For a new Supabase project, apply `supabase-schema.sql` and then `supabase-seed.sql` in the Supabase SQL Editor. Copy the Session pooler connection string from the dashboard's **Connect** panel when connecting from an IPv4-only network; do not compose its host by hand. Download the database root certificate from **Database Settings → SSL Configuration**, save it as `backend/supabase-ca.crt`, and set `DATABASE_SSL_CA_PATH=./supabase-ca.crt`. The backend and migration scripts keep certificate verification enabled and use this CA to verify the database connection.
+
+For an existing SQLite project, keep a backup of both `database.sqlite` and `uploads/`, set `DB_CLIENT=postgres` and `DATABASE_URL`, then run:
 
 ```bash
 npm run db:migrate
