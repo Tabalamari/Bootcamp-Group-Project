@@ -46,6 +46,14 @@ To create a local administrator, set `ADMIN_BOOTSTRAP_EMAIL` and a unique `ADMIN
 
 For a split frontend/API deployment, set `VITE_API_URL` to the backend API URL (ending in `/api`) and configure `CORS_ORIGINS` on the backend with the exact frontend origin. The default `/api` URL works when the Express server serves the frontend from the same origin.
 
+## Render staging deployment
+
+The root `Dockerfile` and `render.yaml` configure one Render web service on the Free plan. The image builds the Vite frontend and runs Express, which serves the frontend and `/api` from one origin. Create the service from the GitHub repository using **New → Blueprint**; Render reads `render.yaml`. The public `profile-photos` Storage bucket must exist in the selected Supabase project.
+
+Render asks for the following values as service secrets during setup; never commit them or place them in the Docker image: `DATABASE_URL` (Supabase Session pooler URL), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `DATABASE_SSL_CA` (the PEM contents of the Supabase database root certificate). Do not set `DATABASE_SSL_CA_PATH` on Render because the Docker image intentionally excludes the local CA file. Use a dedicated staging Supabase project where possible and avoid connecting an unverified deployment to real user data.
+
+The Free web service sleeps after 15 minutes without traffic and may take about a minute to wake on the next request. Its filesystem is temporary, so the app uses Supabase PostgreSQL and Storage for persistent data. If the free monthly usage allowance is exceeded without a payment method, Render suspends the service or disables new builds instead of charging for the excess. After deployment, verify `/api/courses` and complete the two-account browser walkthrough. Never run migration or admin-bootstrap commands as part of image startup.
+
 ## Checks
 
 Run the API suite from `backend`:

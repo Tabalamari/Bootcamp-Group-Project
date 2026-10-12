@@ -1,0 +1,13 @@
+.git
+.git/**
+**/node_modules
+**/.env
+**/.env.*
+!backend/.env.example
+frontend/dist
+backend/uploads
+backend/database.sqlite*
+backend/supabase-ca.crt
+**/*.log
+test-results
+playwright-report
