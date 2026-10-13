@@ -40,7 +40,7 @@ F6 completes the account-management portion of FR-01 beyond the initial F1 miles
 
 - Added an authenticated email-change flow in Account Settings. The user confirms their current password before the account email is updated; no verification email is sent because the project does not use real email delivery.
 - Removed the backend-connection notice from the signed-in interface. Account details span the full row, with the original sidebar restored.
-- Checks: frontend suite 26/26, backend suite 75/75 and production build passed. Commit `1a823ff` is pushed to `feature/prepare-supabase-production`; staging deployment and live verification are in progress. The extension has not been merged into `main`.
+- Checks: frontend suite 26/26, backend suite 75/75 and production build passed. Commit `1a823ff` is pushed to `feature/prepare-supabase-production` and is Live on Render staging. The extension has not been merged into `main`; live account-flow verification remains pending.
 - Qingling: independently verify the email/password validation, updated-email login and account settings layout after staging is live.
 
 ## Assignments for the remaining features
@@ -377,7 +377,7 @@ The feature is complete when all three contributions work together and the share
 ## Render staging deployment - 13 October 2026
 
 - Staging URL: https://bootcamp-connect-staging.onrender.com/ (Render Free web service; Supabase PostgreSQL and Storage).
-- The service deploys `feature/prepare-supabase-production`. Commit `22c73f6` adds a database-independent `/health` liveness route and private logging for course-query failures. Commit `1a823ff` adds the email-change extension and is currently deploying to staging.
+- The service deploys `feature/prepare-supabase-production`. Commit `22c73f6` adds a database-independent `/health` liveness route and private logging for course-query failures. Commit `1a823ff` adds the email-change extension and is **Live** on staging.
 - Initial deploy diagnosis found `DATABASE_SSL_CA` had been set to the local path `./supabase-ca.crt`; Render requires the PEM certificate contents. The verified Supabase root certificate was entered in the Render environment and the new deploy reached **Live**.
-- Live smoke check: the registration page loaded the database-backed course selector from Supabase. `/health` confirms only that the web process responds; `/api/courses` is the database connectivity check.
+- Live smoke checks: `/health` returned `{"status":"ok"}` and `/api/courses` returned Business Development and Software Development from Supabase. The application login page loaded after deployment. `/health` confirms only that the web process responds; `/api/courses` is the database connectivity check.
 - Remaining: Malak to complete the deployed two-account journey (registration, profile/photo persistence, discovery, messaging, logout, and sign-in); Qingling to independently verify the live data and feature behavior. Keep this deployment as staging until those checks and team review are complete.
