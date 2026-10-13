@@ -32,9 +32,16 @@ Keep each feature on a separate branch. If the preceding branch has not merged, 
 | F3 Discovery, filters and fit explanations | **Merged to main**, 8 Oct 2026; `feature/integrate-profiles-discovery` | Implemented; F1–F3 backend suite passed 40 checks | Independent verification pending | Local integration passed; team review pending |
 | F4 Conversations, messages and unread indicators | **Merged to main**, 8 Oct 2026; `feature/integrate-messaging` | Implemented; F1–F4 backend suite passed 51 checks | Independent verification pending | Two-account adapter/API check passed; independent team and browser review pending |
 | F5 Administration: users, courses, categories, skills and interests | **Merged to main**, 8 Oct 2026; `feature/integrate-administration` | Implemented; F1–F5 backend suite passed 61 checks | Independent verification pending | Backend checks and admin browser walkthrough passed; Qingling's independent verification pending |
-| F6 Account settings: name, course and password changes | **Merged to main**, 8 Oct 2026; `feature/integrate-account-settings` | Implemented; F1–F6 backend suite passed 71 checks | Independent verification pending | Frontend suite (24), backend suite (71), production build and Malak's browser walkthrough passed; Qingling's independent verification pending |
+| F6 Account settings: name, course, password and email changes | Core name/course/password settings **merged to main**, 8 Oct 2026; email-change extension on `feature/prepare-supabase-production` (`1a823ff`) | Account and email-change APIs implemented; backend suite passed 75 checks | Independent verification pending | Frontend suite (26), backend suite (75), production build passed; email-change extension is being deployed to staging for verification; Qingling's independent verification pending |
 
 F6 completes the account-management portion of FR-01 beyond the initial F1 milestone. Unread indicators in F4 reflect Malak's accepted messaging design. Other optional PRD features remain deferred. The completed feature branches are now on `main`; Qingling's independent verification remains pending.
+
+### F6 email-change extension - 13 October 2026
+
+- Added an authenticated email-change flow in Account Settings. The user confirms their current password before the account email is updated; no verification email is sent because the project does not use real email delivery.
+- Removed the backend-connection notice from the signed-in interface. Account details span the full row, with the original sidebar restored.
+- Checks: frontend suite 26/26, backend suite 75/75 and production build passed. Commit `1a823ff` is pushed to `feature/prepare-supabase-production`; staging deployment and live verification are in progress. The extension has not been merged into `main`.
+- Qingling: independently verify the email/password validation, updated-email login and account settings layout after staging is live.
 
 ## Assignments for the remaining features
 
@@ -370,7 +377,7 @@ The feature is complete when all three contributions work together and the share
 ## Render staging deployment - 13 October 2026
 
 - Staging URL: https://bootcamp-connect-staging.onrender.com/ (Render Free web service; Supabase PostgreSQL and Storage).
-- The service deploys `feature/prepare-supabase-production`. Commit `22c73f6` adds a database-independent `/health` liveness route and private logging for course-query failures.
+- The service deploys `feature/prepare-supabase-production`. Commit `22c73f6` adds a database-independent `/health` liveness route and private logging for course-query failures. Commit `1a823ff` adds the email-change extension and is currently deploying to staging.
 - Initial deploy diagnosis found `DATABASE_SSL_CA` had been set to the local path `./supabase-ca.crt`; Render requires the PEM certificate contents. The verified Supabase root certificate was entered in the Render environment and the new deploy reached **Live**.
 - Live smoke check: the registration page loaded the database-backed course selector from Supabase. `/health` confirms only that the web process responds; `/api/courses` is the database connectivity check.
 - Remaining: Malak to complete the deployed two-account journey (registration, profile/photo persistence, discovery, messaging, logout, and sign-in); Qingling to independently verify the live data and feature behavior. Keep this deployment as staging until those checks and team review are complete.
