@@ -58,7 +58,7 @@ The Free web service sleeps after 15 minutes without traffic and may take about 
 
 - Public app: <https://bootcamp-connect-staging.onrender.com/>
 - Render service: `bootcamp-connect-staging` on the Free plan; it deploys the `feature/prepare-supabase-production` branch.
-- Latest application commit: `22c73f6` (`Use independent Render health check`). The service is live, and the registration page has successfully loaded the database-backed course list.
+- Latest deployed application commit: `1a823ff` (`feat: allow users to change login email`), merged into `main` by `670d6c3`. The service is live; `/health` and the Supabase-backed `/api/courses` endpoint both passed smoke checks.
 - Render's `/health` endpoint checks that the web process is responding; it does not check Supabase. Use `/api/courses` to verify the PostgreSQL connection and seeded courses.
 - The Render service's `DATABASE_SSL_CA` value must be the PEM certificate contents. `DATABASE_SSL_CA_PATH` is for local development where the certificate file exists.
 - After changing `render.yaml`, run a manual Blueprint sync in Render and approve the listed service changes. Pushing a Blueprint change alone did not apply the updated health-check path.
