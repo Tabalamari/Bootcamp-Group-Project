@@ -9,8 +9,9 @@ test('conversations reuse recipients and isolate accounts, drafts and histories'
   service.saveDraft('one', 'sample-amara', 'Hello Amara');
   service.saveDraft('one', 'sample-daniel', 'Hello Daniel');
   await service.send('one', 'sample-amara', 'Hello Amara');
-  assert.equal(service.list('one').length, 2);
+  assert.equal(service.list('one').length, 1);
   assert.equal(service.list('one')[0].messages[0].text, 'Hello Amara');
+  assert.equal(service.pending('one', 'sample-daniel').person.id, 'sample-daniel');
   assert.equal(service.draft('one', 'sample-amara'), '');
   assert.equal(service.draft('one', 'sample-daniel'), 'Hello Daniel');
   assert.deepEqual(service.list('two'), []);
@@ -24,7 +25,8 @@ test('failed sends preserve drafts, retry sends once, and blank or oversized mes
   service.saveDraft('one', 'sample-amara', 'Try again');
   await assert.rejects(service.send('one', 'sample-amara', 'Try again', true));
   assert.equal(service.draft('one', 'sample-amara'), 'Try again');
-  assert.equal(service.list('one')[0].messages.length, 0);
+  assert.equal(service.list('one').length, 0);
+  assert.equal(service.pending('one', 'sample-amara').person.id, 'sample-amara');
   await service.send('one', 'sample-amara', 'Try again');
   assert.equal(service.list('one')[0].messages.length, 1);
   await assert.rejects(service.send('one', 'sample-amara', '   '));

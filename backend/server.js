@@ -967,7 +967,8 @@ app.get('/api/conversations', authMiddleware, async (req, res) => {
     const rows = await db.prepare(`
       SELECT id, participant1_id, participant2_id, created_at, updated_at
       FROM conversations
-      WHERE participant1_id = ? OR participant2_id = ?
+      WHERE (participant1_id = ? OR participant2_id = ?)
+        AND EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = conversations.id)
       ORDER BY updated_at DESC
     `).all(currentUserId, currentUserId);
 

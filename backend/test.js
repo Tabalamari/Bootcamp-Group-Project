@@ -751,7 +751,41 @@ async function runTests() {
       'TEST 42: Starting a conversation with the same person reuses the existing conversation (Deduplication)'
     );
 
-    // TEST 43: Users cannot start a conversation with themselves (Acceptance Criterion 3)
+    // A profile visit creates a private pending thread so the sender can compose,
+    // but empty threads stay out of both inboxes until the first message is sent.
+    const resPendingConv = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${amaraData.token}` },
+      body: JSON.stringify({ recipientId: danielData.user.id })
+    });
+    const pendingConvData = await resPendingConv.json();
+    const pendingConvId = pendingConvData.conversation?.id;
+    const [resAmaraPendingInbox, resDanielPendingInbox] = await Promise.all([
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${amaraData.token}` } }),
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${danielData.token}` } }),
+    ]);
+    const [amaraPendingInbox, danielPendingInbox] = await Promise.all([
+      resAmaraPendingInbox.json(), resDanielPendingInbox.json(),
+    ]);
+    const resFirstMessage = await fetch(`${baseUrl}/conversations/${pendingConvId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${amaraData.token}` },
+      body: JSON.stringify({ text: 'Hello Daniel!' })
+    });
+    const resDanielInboxAfterMessage = await fetch(`${baseUrl}/conversations`, {
+      headers: { Authorization: `Bearer ${danielData.token}` }
+    });
+    const danielInboxAfterMessage = await resDanielInboxAfterMessage.json();
+    assert(
+      resPendingConv.status === 201 && pendingConvId &&
+      !amaraPendingInbox.conversations.some(c => c.id === pendingConvId) &&
+      !danielPendingInbox.conversations.some(c => c.id === pendingConvId) &&
+      resFirstMessage.status === 201 &&
+      danielInboxAfterMessage.conversations.some(c => c.id === pendingConvId && c.lastMessage.text === 'Hello Daniel!'),
+      'TEST 42A: An empty thread stays out of both inboxes until the first message is sent'
+    );
+
+    // TEST 43: Users cannot start conversations with themselves (Acceptance Criterion 3)
     const resSelfConv = await fetch(`${baseUrl}/conversations`, {
       method: 'POST',
       headers: {

@@ -40,7 +40,7 @@ export default function Messages({ user, selected, onSelect }) {
     return unsubscribe;
   }, [user.id]);
 
-  const current = findSelectedConversation(chats, selected);
+  const current = findSelectedConversation(chats, selected) || service.pending(user.id, selected);
 
   useEffect(() => {
     setDraft(selected ? service.draft(user.id, selected) : '');

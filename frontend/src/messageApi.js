@@ -2,6 +2,7 @@ const apiRoot = (import.meta.env?.VITE_API_URL || '/api').replace(/\/$/, '');
 const assetOrigin = import.meta.env?.VITE_ASSET_ORIGIN || window.location.origin;
 
 let conversations = [];
+let pendingConversations = new Map();
 let ownerId = null;
 const listeners = new Set();
 const drafts = new Map();
@@ -45,17 +46,20 @@ function mapConversation(conversation) {
 async function list(userId) {
   if (ownerId !== userId) {
     conversations = [];
+    pendingConversations = new Map();
     ownerId = userId;
   }
   const data = await request('/conversations');
-  conversations = (data.conversations || []).map(mapConversation);
+  conversations = (data.conversations || []).map(mapConversation)
+    .filter(conversation => conversation.lastMessage || conversation.messages.length);
+  for (const conversation of conversations) pendingConversations.delete(conversation.id);
   notify();
   return structuredClone(conversations);
 }
 
 function getConversation(userId, conversationId) {
   if (ownerId !== userId) throw new Error('Refresh your inbox and try again.');
-  const conversation = conversations.find(item => item.id === conversationId);
+  const conversation = conversations.find(item => item.id === conversationId) || pendingConversations.get(conversationId);
   if (!conversation) throw new Error('Conversation unavailable. Refresh your inbox and try again.');
   return conversation;
 }
@@ -64,6 +68,11 @@ export const messageApi = {
   subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   snapshot() { return structuredClone(conversations); },
   list,
+  pending(userId, conversationId) {
+    if (ownerId !== userId) return null;
+    const conversation = pendingConversations.get(conversationId);
+    return conversation ? structuredClone(conversation) : null;
+  },
   async open(userId, personId) {
     const data = await request('/conversations', {
       method: 'POST',
@@ -71,12 +80,15 @@ export const messageApi = {
       body: JSON.stringify({ recipientId: personId }),
     });
     await list(userId);
+    if (!data.conversation.lastMessage) {
+      pendingConversations.set(data.conversation.id, mapConversation(data.conversation));
+    }
     return data.conversation.id;
   },
   async history(userId, conversationId) {
     const conversation = getConversation(userId, conversationId);
     const data = await request(`/conversations/${encodeURIComponent(conversation.id)}/messages`);
-    const latest = conversations.find(item => item.id === data.conversationId);
+    const latest = conversations.find(item => item.id === data.conversationId) || pendingConversations.get(data.conversationId);
     if (!latest) return [];
     latest.messages = data.messages.map(message => ({
       id: message.id,
@@ -107,6 +119,7 @@ export const messageApi = {
     });
     drafts.delete(draftKey(userId, conversationId));
     await list(userId);
+    pendingConversations.delete(conversationId);
     await this.history(userId, conversationId);
   },
 };

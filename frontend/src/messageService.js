@@ -25,8 +25,12 @@ export function createMessageService() {
   }
   return {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    list(userId) { return structuredClone(account(userId).chats).sort((a,b) => (b.messages.at(-1)?.order || 0) - (a.messages.at(-1)?.order || 0)); },
+    list(userId) { return structuredClone(account(userId).chats.filter(chat => chat.messages.length > 0)).sort((a,b) => (b.messages.at(-1)?.order || 0) - (a.messages.at(-1)?.order || 0)); },
     open,
+    pending(userId, personId) {
+      const conversation = account(userId).chats.find(item => item.person.id === personId && item.messages.length === 0);
+      return conversation ? structuredClone(conversation) : null;
+    },
     read(userId, personId) { const c = chat(userId, personId); if (c.unread) { c.unread = 0; notify(); } },
     draft(userId, personId) { return account(userId).drafts[personId] || ''; },
     saveDraft(userId, personId, text) { account(userId).drafts[personId] = text; },
