@@ -123,3 +123,21 @@ CREATE TABLE IF NOT EXISTS conversation_reads (
   last_read_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (conversation_id, user_id)
 );
+
+-- The application accesses these tables through the Express backend. Enable RLS
+-- so Supabase's public Data API roles cannot read user or messaging data directly.
+-- The backend's server-side database connection uses its privileged connection role.
+ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE interests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connection_goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_interests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_reads ENABLE ROW LEVEL SECURITY;

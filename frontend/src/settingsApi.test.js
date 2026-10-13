@@ -8,7 +8,8 @@ function setup() {
   const fetcher = async (url, options) => {
     calls.push({ url, options });
     if (url.endsWith('/account/password')) return Response.json({ message: 'Password updated successfully.' });
-    if (options.method === 'PATCH') return Response.json({ displayName: 'Malak Updated', courseId: 'business-dev' });
+    if (url.endsWith('/account/email')) return Response.json({ email: 'new@example.com' });
+    if (options.method === 'PATCH') return Response.json({ displayName: 'Malak Updated', courseId: 'business-dev', email: 'malak@example.com' });
     return Response.json({ id: 'one', displayName: 'Malak', email: 'malak@example.com', courseId: 'software-dev' });
   };
   return { api: createSettingsApi({ base: '/api', storage, fetcher }), calls };
@@ -16,8 +17,8 @@ function setup() {
 
 test('account settings API loads and saves the authenticated account', async () => {
   const { api, calls } = setup();
-  assert.deepEqual(await api.get(), { displayName: 'Malak', courseId: 'software-dev' });
-  assert.deepEqual(await api.save({}, { displayName: ' Malak Updated ', courseId: 'business-dev' }), { displayName: 'Malak Updated', courseId: 'business-dev' });
+  assert.deepEqual(await api.get(), { displayName: 'Malak', courseId: 'software-dev', email: 'malak@example.com' });
+  assert.deepEqual(await api.save({}, { displayName: ' Malak Updated ', courseId: 'business-dev' }), { displayName: 'Malak Updated', courseId: 'business-dev', email: 'malak@example.com' });
   assert.equal(calls[0].url, '/api/account');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer session-token');
   assert.equal(calls[1].options.method, 'PATCH');
@@ -31,6 +32,14 @@ test('password API reauthenticates and sends only current and new passwords', as
   assert.equal(call.url, '/api/account/password');
   assert.equal(call.options.method, 'POST');
   assert.deepEqual(JSON.parse(call.options.body), { currentPassword: 'Current123!', newPassword: 'NewPassword456!' });
+});
+
+test('email API sends the normalized new email and current password', async () => {
+  const { api, calls } = setup();
+  assert.deepEqual(await api.email({}, { newEmail: ' New@Example.com ', currentPassword: 'Current123!' }), { email: 'new@example.com' });
+  assert.equal(calls[0].url, '/api/account/email');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { email: 'new@example.com', currentPassword: 'Current123!' });
 });
 
 test('account settings API preserves server status and message for form feedback', async () => {

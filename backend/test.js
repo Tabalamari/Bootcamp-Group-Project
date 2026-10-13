@@ -6,7 +6,19 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+// API tests must always use an isolated in-memory SQLite database, even if a developer's
+// backend/.env points at Supabase. This test suite creates and deletes test records.
+process.env.NODE_ENV = 'test';
+process.env.DB_CLIENT = 'sqlite';
+delete process.env.DATABASE_URL;
 process.env.DATABASE_PATH = ':memory:';
+// dotenv must not restore Supabase credentials from a developer's local .env
+// when the API server is required below. Tests use local photo storage only.
+process.env.SUPABASE_URL = '';
+process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+process.env.SUPABASE_PROFILE_PHOTOS_BUCKET = '';
 const app = require('./server');
 const db = require('./db');
 
@@ -32,10 +44,21 @@ async function runTests() {
   }
 
   try {
-    // Clean up test users and admin fixtures before tests (if any remain)
+    // Clean up test records before creating this run's administrator fixture.
     await db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
     await db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
     await db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
+    const defaultAdmin = await db.prepare("SELECT id FROM users WHERE email = 'admin@example.com'").get();
+    assert(!defaultAdmin, 'Database setup does not create a default administrator with a fixed password');
+
+    const testAdminPassword = crypto.randomBytes(24).toString('base64url');
+    await db.prepare(`
+      INSERT INTO users (id, email, password_hash, display_name, course_id, role, status)
+      VALUES (?, ?, ?, ?, ?, 'admin', 'active')
+    `).run('test-admin', 'test-admin@example.com', bcrypt.hashSync(testAdminPassword, 10), 'Test Administrator', 'software-dev');
+    await db.prepare(`
+      INSERT OR IGNORE INTO profiles (user_id, bio, photo_url) VALUES (?, ?, NULL)
+    `).run('test-admin', 'Test administrator');
 
     // =========================================================
     // FR-01: AUTHENTICATION & COURSES
@@ -964,7 +987,7 @@ async function runTests() {
     const resAdminLogin = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@example.com', password: 'AdminPassword123!' })
+      body: JSON.stringify({ email: 'test-admin@example.com', password: testAdminPassword })
     });
     const adminLoginData = await resAdminLogin.json();
     const adminToken = adminLoginData.token;
@@ -1419,6 +1442,64 @@ async function runTests() {
     assert(
       resAccountAuxiliaryAccess.status === 401 && resAccountCurrentAccess.status === 200,
       'TEST 71: Password change revokes auxiliary sessions while keeping the current token active'
+    );
+
+    // TEST 72: Email change requires the correct current password
+    const resEmailWrongPassword = await fetch(`${baseUrl}/account/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+      body: JSON.stringify({ email: 'new-test-student@example.com', currentPassword: 'WrongPassword999!' })
+    });
+    assert(resEmailWrongPassword.status === 401, 'TEST 72: POST /api/account/email rejects an incorrect current password');
+
+    // TEST 73: Email change validates the new address and rejects duplicates
+    const [resInvalidEmail, resDuplicateEmail] = await Promise.all([
+      fetch(`${baseUrl}/account/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+        body: JSON.stringify({ email: 'not-an-email', currentPassword: newTestPassword })
+      }),
+      fetch(`${baseUrl}/account/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+        body: JSON.stringify({ email: 'TEST_SECOND@example.com', currentPassword: newTestPassword })
+      })
+    ]);
+    assert(resInvalidEmail.status === 400 && resDuplicateEmail.status === 409, 'TEST 73: Email change rejects invalid and already-used addresses');
+
+    // TEST 74: A successful change normalizes the email, preserves this session and revokes other sessions
+    const resEmailAuxiliaryLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: newTestPassword })
+    });
+    const emailAuxiliarySession = await resEmailAuxiliaryLogin.json();
+    const changedEmail = 'test_student_updated@example.com';
+    const resChangeEmail = await fetch(`${baseUrl}/account/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+      body: JSON.stringify({ email: ' TEST_Student_Updated@Example.com ', currentPassword: newTestPassword })
+    });
+    const changedEmailData = await resChangeEmail.json();
+    testUser.email = changedEmail;
+    const [resUpdatedEmailLogin, resOldEmailLogin, resEmailCurrentSession, resEmailRevokedSession] = await Promise.all([
+      fetch(`${baseUrl}/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: changedEmail, password: newTestPassword })
+      }),
+      fetch(`${baseUrl}/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test_student@example.com', password: newTestPassword })
+      }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${settingsToken}` } }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${emailAuxiliarySession.token}` } })
+    ]);
+    const updatedEmailLogin = await resUpdatedEmailLogin.json();
+    assert(
+      resChangeEmail.status === 200 && changedEmailData.email === changedEmail &&
+      resUpdatedEmailLogin.status === 200 && updatedEmailLogin.user.email === changedEmail &&
+      resOldEmailLogin.status === 401 && resEmailCurrentSession.status === 200 && resEmailRevokedSession.status === 401,
+      'TEST 74: New email becomes the login, old email stops working, current session stays active and other sessions are revoked'
     );
 
   } catch (err) {

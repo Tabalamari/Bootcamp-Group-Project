@@ -31,19 +31,25 @@ export function createSettingsApi({ base = defaultBase, storage = globalThis.win
   return {
     async get() {
       const account = await request('/account');
-      return { displayName: account.displayName, courseId: account.courseId };
+      return { displayName: account.displayName, courseId: account.courseId, email: account.email };
     },
     async save(_user, values) {
       const account = await request('/account', 'PATCH', {
         displayName: values.displayName.trim(),
         courseId: values.courseId,
       });
-      return { displayName: account.displayName, courseId: account.courseId };
+      return { displayName: account.displayName, courseId: account.courseId, email: account.email };
     },
     async password(_user, values) {
       return request('/account/password', 'POST', {
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
+      });
+    },
+    async email(_user, values) {
+      return request('/account/email', 'POST', {
+        email: values.newEmail.trim().toLowerCase(),
+        currentPassword: values.currentPassword,
       });
     },
   };

@@ -6,18 +6,32 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db');
+const { createSupabasePhotoStorage } = require('./photo-storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const photoBucket = process.env.SUPABASE_PROFILE_PHOTOS_BUCKET || 'profile-photos';
+const hasSupabasePhotoConfig = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+const photoStorage = hasSupabasePhotoConfig
+  ? createSupabasePhotoStorage({
+      url: process.env.SUPABASE_URL,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      bucket: photoBucket,
+    })
+  : null;
+
+if (process.env.NODE_ENV === 'production' && db.clientType === 'postgres' && !photoStorage) {
+  throw new Error('Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before starting production with PostgreSQL');
+}
 
 // Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 // Multer storage setup for avatar uploads
-const storage = multer.diskStorage({
+const storage = photoStorage ? multer.memoryStorage() : multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
@@ -43,9 +57,33 @@ const upload = multer({
   }
 });
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(cors(process.env.NODE_ENV === 'production'
+  ? {
+      origin(origin, callback) {
+        callback(null, !origin || allowedOrigins.includes(origin));
+      },
+    }
+  : { origin: true }));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
+
+async function removeStoredPhoto(photoUrl) {
+  if (!photoUrl) return;
+  const objectKey = photoStorage?.objectKeyFromUrl(photoUrl);
+  if (objectKey) {
+    await photoStorage.remove(objectKey);
+    return;
+  }
+  if (photoUrl.startsWith('/uploads/')) {
+    const filename = path.basename(photoUrl);
+    const filePath = path.join(uploadsDir, filename);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
 
 // Photo upload middleware with custom error handling
 function photoUploadMiddleware(req, res, next) {
@@ -183,6 +221,12 @@ async function authMiddleware(req, res, next) {
 // -------------------------------------------------------------
 // 1. Get list of active courses (GET /api/courses)
 // -------------------------------------------------------------
+// Keep the platform liveness check independent of database availability so a
+// database connection problem can be diagnosed through the API separately.
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.get('/api/courses', async (req, res) => {
   try {
     const courses = await db.prepare(`
@@ -194,6 +238,7 @@ app.get('/api/courses', async (req, res) => {
 
     res.json(courses);
   } catch (error) {
+    console.error('[Courses API] Failed to retrieve courses:', error.message);
     res.status(500).json({ error: 'Failed to retrieve courses' });
   }
 });
@@ -524,31 +569,40 @@ app.put(['/api/profiles/me', '/api/profile/me'], authMiddleware, handleUpdatePro
 // 9. Upload Profile Photo (POST /api/profiles/me/photo)
 // -------------------------------------------------------------
 app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, photoUploadMiddleware, async (req, res) => {
+  let newlyUploadedKey = null;
+  let newlyUploadedLocalPath = null;
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
     const prevProfile = await db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
-    if (prevProfile && prevProfile.photo_url) {
-      const prevFilename = path.basename(prevProfile.photo_url);
-      const prevFilePath = path.join(uploadsDir, prevFilename);
-      if (fs.existsSync(prevFilePath)) {
-        try {
-          fs.unlinkSync(prevFilePath);
-        } catch (e) {
-          // ignore unlink error
-        }
-      }
+    let photoUrl;
+    if (photoStorage) {
+      const extension = path.extname(req.file.originalname).toLowerCase();
+      newlyUploadedKey = `${req.user.id}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}${extension}`;
+      photoUrl = await photoStorage.upload(newlyUploadedKey, req.file.buffer, req.file.mimetype);
+    } else {
+      photoUrl = `/uploads/${req.file.filename}`;
+      newlyUploadedLocalPath = path.join(uploadsDir, req.file.filename);
     }
-
-    const photoUrl = `/uploads/${req.file.filename}`;
 
     await db.prepare(`
       INSERT INTO profiles (user_id, bio, photo_url)
       VALUES (?, '', ?)
       ON CONFLICT(user_id) DO UPDATE SET photo_url = ?, updated_at = CURRENT_TIMESTAMP
     `).run(req.user.id, photoUrl, photoUrl);
+    // The database now owns the new URL; later response errors must not remove its asset.
+    newlyUploadedKey = null;
+    newlyUploadedLocalPath = null;
+
+    if (prevProfile?.photo_url && prevProfile.photo_url !== photoUrl) {
+      try {
+        await removeStoredPhoto(prevProfile.photo_url);
+      } catch (error) {
+        console.warn('[Photo cleanup warning]: unable to remove previous profile photo:', error.message);
+      }
+    }
 
     const profile = await getUserProfile(req.user.id);
     res.json({
@@ -557,6 +611,8 @@ app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, ph
       profile
     });
   } catch (error) {
+    if (newlyUploadedKey && photoStorage) await photoStorage.remove(newlyUploadedKey).catch(() => {});
+    if (newlyUploadedLocalPath && fs.existsSync(newlyUploadedLocalPath)) fs.unlinkSync(newlyUploadedLocalPath);
     res.status(500).json({ error: 'Failed to upload photo' });
   }
 });
@@ -567,23 +623,19 @@ app.post(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, ph
 app.delete(['/api/profiles/me/photo', '/api/profile/me/photo'], authMiddleware, async (req, res) => {
   try {
     const profile = await db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(req.user.id);
-    if (profile && profile.photo_url) {
-      const filename = path.basename(profile.photo_url);
-      const filePath = path.join(uploadsDir, filename);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          // ignore unlink error
-        }
-      }
-    }
-
     await db.prepare(`
       UPDATE profiles 
       SET photo_url = NULL, updated_at = CURRENT_TIMESTAMP 
       WHERE user_id = ?
     `).run(req.user.id);
+
+    if (profile?.photo_url) {
+      try {
+        await removeStoredPhoto(profile.photo_url);
+      } catch (error) {
+        console.warn('[Photo cleanup warning]: unable to remove profile photo:', error.message);
+      }
+    }
 
     res.json({
       photoUrl: null,
@@ -1802,6 +1854,65 @@ async function handleUpdateAccount(req, res) {
 app.patch(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
 app.put(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
 
+// Change the login email only after reauthenticating with the account password.
+app.post('/api/account/email', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const now = Date.now();
+    const attemptRecord = passwordAttemptLimiter.get(userId);
+    if (attemptRecord) {
+      if (now - attemptRecord.firstAttemptTime > RATE_LIMIT_WINDOW_MS) {
+        passwordAttemptLimiter.delete(userId);
+      } else if (attemptRecord.count >= MAX_PASSWORD_ATTEMPTS) {
+        return res.status(429).json({ error: 'Too many failed password attempts. Please try again later.' });
+      }
+    }
+
+    const { email, currentPassword } = req.body;
+    if (typeof email !== 'string' || typeof currentPassword !== 'string' || !currentPassword) {
+      return res.status(400).json({ error: 'A new email address and current password are required.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (normalizedEmail === req.user.email.toLowerCase()) {
+      return res.status(400).json({ error: 'Enter a different email address.' });
+    }
+
+    const user = await db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
+    if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+      const attempts = passwordAttemptLimiter.get(userId) || { count: 0, firstAttemptTime: now };
+      attempts.count += 1;
+      passwordAttemptLimiter.set(userId, attempts);
+      return res.status(401).json({ error: 'The current password is incorrect.' });
+    }
+
+    const existing = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?').get(normalizedEmail, userId);
+    if (existing) return res.status(409).json({ error: 'That email address is already in use.' });
+
+    try {
+      const updateEmailTx = db.transaction(async () => {
+        await db.prepare('UPDATE users SET email = ? WHERE id = ?').run(normalizedEmail, userId);
+        await db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, req.token);
+      });
+      await updateEmailTx();
+    } catch (error) {
+      if (error.code === '23505' || /unique constraint/i.test(error.message || '')) {
+        return res.status(409).json({ error: 'That email address is already in use.' });
+      }
+      throw error;
+    }
+
+    passwordAttemptLimiter.delete(userId);
+    res.json({ email: normalizedEmail, message: 'Email address updated. Use it for your next sign-in.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update email address.' });
+  }
+});
+
 // -------------------------------------------------------------
 // 28. Change Password with Reauthentication (POST /api/account/password)
 // -------------------------------------------------------------
@@ -1872,6 +1983,20 @@ app.post('/api/account/password', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to update password' });
   }
 });
+
+// Serve the Vite build from the same origin when deploying the full app as one Fly.io service.
+// During local development the Vite dev server handles the frontend instead.
+const frontendDist = path.resolve(__dirname, '../frontend/dist');
+const frontendIndex = path.join(frontendDist, 'index.html');
+if (fs.existsSync(frontendIndex)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET' || req.path === '/api' || req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+      return next();
+    }
+    res.sendFile(frontendIndex);
+  });
+}
 
 // Start the server if file is executed directly
 if (require.main === module) {

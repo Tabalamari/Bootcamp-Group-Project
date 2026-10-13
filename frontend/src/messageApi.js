@@ -1,5 +1,5 @@
 const apiRoot = (import.meta.env?.VITE_API_URL || '/api').replace(/\/$/, '');
-const assetOrigin = import.meta.env?.VITE_ASSET_ORIGIN || `${window.location.protocol}//${window.location.hostname}:3000`;
+const assetOrigin = import.meta.env?.VITE_ASSET_ORIGIN || window.location.origin;
 
 let conversations = [];
 let ownerId = null;
