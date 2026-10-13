@@ -54,6 +54,16 @@ Render asks for the following values as service secrets during setup; never comm
 
 The Free web service sleeps after 15 minutes without traffic and may take about a minute to wake on the next request. Its filesystem is temporary, so the app uses Supabase PostgreSQL and Storage for persistent data. If the free monthly usage allowance is exceeded without a payment method, Render suspends the service or disables new builds instead of charging for the excess. After deployment, verify `/api/courses` and complete the two-account browser walkthrough. Never run migration or admin-bootstrap commands as part of image startup.
 
+### Current staging deployment (13 October 2026)
+
+- Public app: <https://bootcamp-connect-staging.onrender.com/>
+- Render service: `bootcamp-connect-staging` on the Free plan; it deploys the `feature/prepare-supabase-production` branch.
+- Latest application commit: `22c73f6` (`Use independent Render health check`). The service is live, and the registration page has successfully loaded the database-backed course list.
+- Render's `/health` endpoint checks that the web process is responding; it does not check Supabase. Use `/api/courses` to verify the PostgreSQL connection and seeded courses.
+- The Render service's `DATABASE_SSL_CA` value must be the PEM certificate contents. `DATABASE_SSL_CA_PATH` is for local development where the certificate file exists.
+- After changing `render.yaml`, run a manual Blueprint sync in Render and approve the listed service changes. Pushing a Blueprint change alone did not apply the updated health-check path.
+- Still to verify on the deployed site: complete the end-to-end learner journey with two test accounts, including registration, profile/photo persistence, discovery, messaging, logout, and sign-in again. Treat the current deployment as staging until that walkthrough and the team's review are complete.
+
 ## Checks
 
 Run the API suite from `backend`:
