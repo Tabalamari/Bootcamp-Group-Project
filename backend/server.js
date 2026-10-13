@@ -1854,6 +1854,65 @@ async function handleUpdateAccount(req, res) {
 app.patch(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
 app.put(['/api/account', '/api/account/settings'], authMiddleware, handleUpdateAccount);
 
+// Change the login email only after reauthenticating with the account password.
+app.post('/api/account/email', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const now = Date.now();
+    const attemptRecord = passwordAttemptLimiter.get(userId);
+    if (attemptRecord) {
+      if (now - attemptRecord.firstAttemptTime > RATE_LIMIT_WINDOW_MS) {
+        passwordAttemptLimiter.delete(userId);
+      } else if (attemptRecord.count >= MAX_PASSWORD_ATTEMPTS) {
+        return res.status(429).json({ error: 'Too many failed password attempts. Please try again later.' });
+      }
+    }
+
+    const { email, currentPassword } = req.body;
+    if (typeof email !== 'string' || typeof currentPassword !== 'string' || !currentPassword) {
+      return res.status(400).json({ error: 'A new email address and current password are required.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (normalizedEmail === req.user.email.toLowerCase()) {
+      return res.status(400).json({ error: 'Enter a different email address.' });
+    }
+
+    const user = await db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
+    if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+      const attempts = passwordAttemptLimiter.get(userId) || { count: 0, firstAttemptTime: now };
+      attempts.count += 1;
+      passwordAttemptLimiter.set(userId, attempts);
+      return res.status(401).json({ error: 'The current password is incorrect.' });
+    }
+
+    const existing = await db.prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?').get(normalizedEmail, userId);
+    if (existing) return res.status(409).json({ error: 'That email address is already in use.' });
+
+    try {
+      const updateEmailTx = db.transaction(async () => {
+        await db.prepare('UPDATE users SET email = ? WHERE id = ?').run(normalizedEmail, userId);
+        await db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(userId, req.token);
+      });
+      await updateEmailTx();
+    } catch (error) {
+      if (error.code === '23505' || /unique constraint/i.test(error.message || '')) {
+        return res.status(409).json({ error: 'That email address is already in use.' });
+      }
+      throw error;
+    }
+
+    passwordAttemptLimiter.delete(userId);
+    res.json({ email: normalizedEmail, message: 'Email address updated. Use it for your next sign-in.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update email address.' });
+  }
+});
+
 // -------------------------------------------------------------
 // 28. Change Password with Reauthentication (POST /api/account/password)
 // -------------------------------------------------------------

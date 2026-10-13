@@ -556,6 +556,21 @@ All administrator endpoints require an active session belonging to a user with `
     }
     ```
 
+#### 28. Change Login Email with Reauthentication (Protected)
+- **`POST /api/account/email`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):**
+    ```json
+    {
+      "email": "new-address@example.com",
+      "currentPassword": "CurrentPassword123!"
+    }
+    ```
+  - Normalizes the address to lowercase and validates its format and uniqueness (`400` for invalid input, `401` for an incorrect password, `409` when already in use).
+  - Requires the current password and limits failed password attempts. No email is sent; the new address becomes the login immediately.
+  - Revokes the user's other active sessions while preserving the current session.
+  - **Response (200 OK):** `{ "email": "new-address@example.com", "message": "Email address updated. Use it for your next sign-in." }`
+
 ---
 
 ## 🗄 SQLite Database Schema

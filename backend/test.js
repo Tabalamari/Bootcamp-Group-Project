@@ -1444,6 +1444,64 @@ async function runTests() {
       'TEST 71: Password change revokes auxiliary sessions while keeping the current token active'
     );
 
+    // TEST 72: Email change requires the correct current password
+    const resEmailWrongPassword = await fetch(`${baseUrl}/account/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+      body: JSON.stringify({ email: 'new-test-student@example.com', currentPassword: 'WrongPassword999!' })
+    });
+    assert(resEmailWrongPassword.status === 401, 'TEST 72: POST /api/account/email rejects an incorrect current password');
+
+    // TEST 73: Email change validates the new address and rejects duplicates
+    const [resInvalidEmail, resDuplicateEmail] = await Promise.all([
+      fetch(`${baseUrl}/account/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+        body: JSON.stringify({ email: 'not-an-email', currentPassword: newTestPassword })
+      }),
+      fetch(`${baseUrl}/account/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+        body: JSON.stringify({ email: 'TEST_SECOND@example.com', currentPassword: newTestPassword })
+      })
+    ]);
+    assert(resInvalidEmail.status === 400 && resDuplicateEmail.status === 409, 'TEST 73: Email change rejects invalid and already-used addresses');
+
+    // TEST 74: A successful change normalizes the email, preserves this session and revokes other sessions
+    const resEmailAuxiliaryLogin = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testUser.email, password: newTestPassword })
+    });
+    const emailAuxiliarySession = await resEmailAuxiliaryLogin.json();
+    const changedEmail = 'test_student_updated@example.com';
+    const resChangeEmail = await fetch(`${baseUrl}/account/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settingsToken}` },
+      body: JSON.stringify({ email: ' TEST_Student_Updated@Example.com ', currentPassword: newTestPassword })
+    });
+    const changedEmailData = await resChangeEmail.json();
+    testUser.email = changedEmail;
+    const [resUpdatedEmailLogin, resOldEmailLogin, resEmailCurrentSession, resEmailRevokedSession] = await Promise.all([
+      fetch(`${baseUrl}/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: changedEmail, password: newTestPassword })
+      }),
+      fetch(`${baseUrl}/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test_student@example.com', password: newTestPassword })
+      }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${settingsToken}` } }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${emailAuxiliarySession.token}` } })
+    ]);
+    const updatedEmailLogin = await resUpdatedEmailLogin.json();
+    assert(
+      resChangeEmail.status === 200 && changedEmailData.email === changedEmail &&
+      resUpdatedEmailLogin.status === 200 && updatedEmailLogin.user.email === changedEmail &&
+      resOldEmailLogin.status === 401 && resEmailCurrentSession.status === 200 && resEmailRevokedSession.status === 401,
+      'TEST 74: New email becomes the login, old email stops working, current session stays active and other sessions are revoked'
+    );
+
   } catch (err) {
     console.error('Error during test execution:', err);
     failed++;
