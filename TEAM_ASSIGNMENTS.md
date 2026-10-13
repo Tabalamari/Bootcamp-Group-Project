@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 8 October 2026
+Last updated: 13 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-06
 
@@ -366,3 +366,11 @@ The feature is complete when all three contributions work together and the share
 - Marianna: review the frontend/API connection on `feature/integrate-administration`.
 - Qingling: independently verify admin workflows, role denial, persistence, suspension effects and privacy guarantees.
 - Malak: complete browser walkthrough and address review feedback. Application changes remain off `main`; publish/merge only when agreed.
+
+## Render staging deployment - 13 October 2026
+
+- Staging URL: https://bootcamp-connect-staging.onrender.com/ (Render Free web service; Supabase PostgreSQL and Storage).
+- The service deploys `feature/prepare-supabase-production`. Commit `22c73f6` adds a database-independent `/health` liveness route and private logging for course-query failures.
+- Initial deploy diagnosis found `DATABASE_SSL_CA` had been set to the local path `./supabase-ca.crt`; Render requires the PEM certificate contents. The verified Supabase root certificate was entered in the Render environment and the new deploy reached **Live**.
+- Live smoke check: the registration page loaded the database-backed course selector from Supabase. `/health` confirms only that the web process responds; `/api/courses` is the database connectivity check.
+- Remaining: Malak to complete the deployed two-account journey (registration, profile/photo persistence, discovery, messaging, logout, and sign-in); Qingling to independently verify the live data and feature behavior. Keep this deployment as staging until those checks and team review are complete.
