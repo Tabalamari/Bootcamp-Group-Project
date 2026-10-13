@@ -3,6 +3,8 @@ services:
     name: bootcamp-connect-staging
     runtime: docker
     plan: free
+    region: frankfurt
+    branch: feature/prepare-supabase-production
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/courses
