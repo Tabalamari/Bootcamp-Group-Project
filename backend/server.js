@@ -221,6 +221,12 @@ async function authMiddleware(req, res, next) {
 // -------------------------------------------------------------
 // 1. Get list of active courses (GET /api/courses)
 // -------------------------------------------------------------
+// Keep the platform liveness check independent of database availability so a
+// database connection problem can be diagnosed through the API separately.
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.get('/api/courses', async (req, res) => {
   try {
     const courses = await db.prepare(`
@@ -232,6 +238,7 @@ app.get('/api/courses', async (req, res) => {
 
     res.json(courses);
   } catch (error) {
+    console.error('[Courses API] Failed to retrieve courses:', error.message);
     res.status(500).json({ error: 'Failed to retrieve courses' });
   }
 });
