@@ -3,6 +3,7 @@ import { Avatar } from './Profile';
 import { isDemo } from './authService';
 import { messageApi } from './messageApi';
 import { messageService } from './messageService';
+import { findSelectedConversation, isConversationSelected } from './messageSelection';
 
 const service = isDemo ? messageService : messageApi;
 
@@ -12,6 +13,8 @@ export default function Messages({ user, selected, onSelect }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [sending, setSending] = useState(false);
   const [failNext, setFailNext] = useState(false);
   const end = useRef(null);
@@ -37,13 +40,19 @@ export default function Messages({ user, selected, onSelect }) {
     return unsubscribe;
   }, [user.id]);
 
-  const current = chats.find(c => c.id === selected || c.person.id === selected);
+  const current = findSelectedConversation(chats, selected);
 
   useEffect(() => {
     setDraft(selected ? service.draft(user.id, selected) : '');
     setError('');
-    if (!selected || isDemo) return;
-    messageApi.history(user.id, selected).catch(e => setError(e.message));
+    setHistoryError('');
+    if (!selected || isDemo) { setHistoryLoading(false); return; }
+    let active = true;
+    setHistoryLoading(true);
+    messageApi.history(user.id, selected)
+      .catch(e => { if (active) setHistoryError(e.message); })
+      .finally(() => { if (active) setHistoryLoading(false); });
+    return () => { active = false; };
   }, [selected, user.id]);
 
   useEffect(() => {
@@ -56,7 +65,10 @@ export default function Messages({ user, selected, onSelect }) {
     return () => document.removeEventListener('visibilitychange', markRead);
   }, [selected, current?.unread, user.id]);
 
-  useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }); }, [selected, current?.messages.length]);
+  useEffect(() => {
+    const history = end.current?.parentElement;
+    if (history) history.scrollTop = history.scrollHeight;
+  }, [selected, current?.messages.length]);
 
   async function send(event) {
     event.preventDefault();
@@ -81,11 +93,11 @@ export default function Messages({ user, selected, onSelect }) {
     {loading ? <p role="status">Loading conversations…</p> : <div className={`inbox-layout ${current ? 'chat-open' : ''}`}>
       <aside className="conversation-list form-card" aria-label="Conversations"><div className="flex items-center justify-between gap-3"><h2>Your conversations</h2><button className="text-button" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button></div>
         {!chats.length && <p className="intro">No conversations yet. <a href="#discover">Find someone in Discover</a> and open their profile to say hello.</p>}
-        {chats.map(c => { const chatKey = c.id || c.person.id; return <button className="conversation-item" key={chatKey} aria-pressed={selected === chatKey || selected === c.person.id} disabled={sending} onClick={() => onSelect(chatKey)}><Avatar photo={c.person.photo} name={c.person.displayName}/><span><strong>{c.person.displayName}</strong><span className="conversation-preview">{c.lastMessage?.text || c.messages.at(-1)?.text || 'Start your conversation'}</span></span>{c.unread > 0 && <span className="unread-badge" aria-label={`${c.unread} unread messages`}>{c.unread}</span>}</button>; })}
+        {chats.map(c => { const chatKey = c.id || c.person.id; return <button className="conversation-item" key={chatKey} aria-pressed={isConversationSelected(c, selected)} disabled={sending} onClick={() => onSelect(chatKey)}><Avatar photo={c.person.photo} name={c.person.displayName}/><span><strong>{c.person.displayName}</strong><span className="conversation-preview">{c.lastMessage?.text || c.messages.at(-1)?.text || 'Start your conversation'}</span></span>{c.unread > 0 && <span className="unread-badge" aria-label={`${c.unread} unread messages`}>{c.unread}</span>}</button>; })}
       </aside>
       <div className="chat-panel form-card">
         {current ? <><header className="chat-heading"><button className="text-button mobile-chat-back" disabled={sending} onClick={() => onSelect(null)}>← All conversations</button><div className="flex items-center gap-3"><Avatar photo={current.person.photo} name={current.person.displayName}/><h2>{current.person.displayName}</h2></div></header>
-          <div className="message-history" role="log" aria-label={`Messages with ${current.person.displayName}`} aria-live="polite">{!current.messages.length && <p className="intro">Say hello and introduce yourself.</p>}{current.messages.map(m => <div className={`message-bubble ${m.sender === 'you' ? 'outgoing' : 'incoming'}`} key={m.id}><span className="message-author">{m.sender === 'you' ? 'You' : current.person.displayName}</span><p>{m.text}</p><time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>)}<div ref={end}/></div>
+          <div className="message-history" role="log" aria-label={`Messages with ${current.person.displayName}`} aria-live="polite">{historyLoading ? <p role="status" className="intro">Loading message history…</p> : historyError ? <div role="alert" className="error-banner">{historyError}<button className="text-button" onClick={() => { setHistoryError(''); setHistoryLoading(true); messageApi.history(user.id, selected).catch(e => setHistoryError(e.message)).finally(() => setHistoryLoading(false)); }}>Try again</button></div> : !current.messages.length ? <p className="intro">{current.person.status === 'deleted' ? 'No earlier messages are available in this conversation.' : 'Say hello and introduce yourself.'}</p> : current.messages.map(m => <div className={`message-bubble ${m.sender === 'you' ? 'outgoing' : 'incoming'}`} key={m.id}><span className="message-author">{m.sender === 'you' ? 'You' : current.person.displayName}</span><p>{m.text}</p><time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>)}<div ref={end}/></div>
           {current.person.status === 'deleted' ? <p className="deleted-chat-notice" role="status">This conversation is read-only because this account was deleted. Earlier messages are kept for your records.</p> : <form onSubmit={send} className="message-composer"><label htmlFor="message-draft">Your message</label><textarea id="message-draft" maxLength={2000} value={draft} disabled={sending} onChange={e => { setDraft(e.target.value); service.saveDraft(user.id, selected, e.target.value); }} placeholder="Write a friendly hello…"/><div className="composer-actions"><span className="field-help">{draft.length}/2,000 · Enter adds a new line</span><button className="primary" disabled={sending || !draft.trim()}>{sending ? 'Sending…' : 'Send message'}</button></div></form>}
         </> : <div className="chat-placeholder"><h2>A space to connect</h2><p>Choose a conversation or find someone new in Discover.</p><a href="#discover">Discover people →</a></div>}
         {error && <div role="alert" className="error-banner">{error}{!current && <button className="text-button" onClick={() => load()}>Try again</button>}</div>}
