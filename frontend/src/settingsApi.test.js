@@ -4,15 +4,17 @@ import { createSettingsApi } from './settingsApi.js';
 
 function setup() {
   const calls = [];
-  const storage = { getItem: key => key === 'bootcamp-connect-token' ? 'session-token' : null };
+  const removed = [];
+  const storage = { getItem: key => key === 'bootcamp-connect-token' ? 'session-token' : null, removeItem: key => removed.push(key) };
   const fetcher = async (url, options) => {
     calls.push({ url, options });
+    if (options.method === 'DELETE') return new Response(null, { status: 204 });
     if (url.endsWith('/account/password')) return Response.json({ message: 'Password updated successfully.' });
     if (url.endsWith('/account/email')) return Response.json({ email: 'new@example.com' });
     if (options.method === 'PATCH') return Response.json({ displayName: 'Malak Updated', courseId: 'business-dev', email: 'malak@example.com' });
     return Response.json({ id: 'one', displayName: 'Malak', email: 'malak@example.com', courseId: 'software-dev' });
   };
-  return { api: createSettingsApi({ base: '/api', storage, fetcher }), calls };
+  return { api: createSettingsApi({ base: '/api', storage, fetcher }), calls, removed };
 }
 
 test('account settings API loads and saves the authenticated account', async () => {
@@ -40,6 +42,16 @@ test('email API sends the normalized new email and current password', async () =
   assert.equal(calls[0].url, '/api/account/email');
   assert.equal(calls[0].options.method, 'POST');
   assert.deepEqual(JSON.parse(calls[0].options.body), { email: 'new@example.com', currentPassword: 'Current123!' });
+});
+
+test('account deletion sends password and typed confirmation, then clears only the local session token', async () => {
+  const { api, calls, removed } = setup();
+  await api.deleteAccount({}, { currentPassword: 'Current123!', confirmText: 'DELETE' });
+  assert.equal(calls[0].url, '/api/account');
+  assert.equal(calls[0].options.method, 'DELETE');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer session-token');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { currentPassword: 'Current123!', confirmText: 'DELETE' });
+  assert.deepEqual(removed, ['bootcamp-connect-token']);
 });
 
 test('account settings API preserves server status and message for form feedback', async () => {

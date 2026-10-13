@@ -1,6 +1,18 @@
 # Bootcamp Connect
 
-Bootcamp Connect helps software-development and business-development learners find peers for collaboration, mentoring, and professional connection.
+Bootcamp Connect is a community platform for software-development and business-development learners. It helps people connect across courses, discover peers with complementary skills and interests, and continue conversations as they collaborate, mentor one another, and build professional relationships. The responsive app is designed for laptop, desktop, and mobile use.
+
+## Features
+
+- **Accounts and courses:** Register, sign in, choose a course, and sign out. Protected features require an authenticated account.
+- **Profiles:** Create and edit a profile with a photo, biography, skills, interests, and collaboration goals. Profile data and photos persist across sessions.
+- **Peer discovery:** Search and filter active learner profiles by course, skills, interests, and goals. Profile pages explain shared criteria behind each suggested connection.
+- **Private messaging:** Start or continue one-to-one conversations, see conversation history and unread counts, and return to chats later.
+- **Administration:** Authorized administrators can manage courses and profile categories, skills, and interests, and review or update learner accounts.
+- **Account settings:** Update account details and course, change a password after confirming the current password, and change the login email after confirming the current password. The app does not send email verification messages.
+- **Delete account:** Permanently remove an account after password confirmation and an explicit warning. The account's profile, credentials, sessions, personal options and photo are removed; existing chats remain for other participants with the former sender shown as “Deleted User,” and those conversations become read-only.
+
+The deployed app is currently a **staging** service. Complete the two-account browser walkthrough and team review before treating it as production-ready.
 
 ## Current architecture
 
@@ -11,6 +23,8 @@ Bootcamp Connect helps software-development and business-development learners fi
 - The Express server can serve `frontend/dist` when the frontend has been built, so the app can run from one Node host.
 
 The repository contains the SQLite-to-PostgreSQL adapter, Supabase schema and starter data, and migration scripts. The repository alone cannot confirm the current row counts or contents of the team's live Supabase project; verify those in the Supabase dashboard before relying on a migration.
+
+For an existing Supabase database, apply `backend/migrations/account-deletion-postgres.sql` before deploying account deletion. It changes only conversation and message foreign-key behavior so account removal anonymizes references while retaining history; it does not delete existing rows. Existing message text is retained and may still contain personal details written by participants, so account deletion does not erase or redact information included in message bodies.
 
 ## Local development
 

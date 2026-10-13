@@ -199,12 +199,12 @@ if (isPostgresClient) {
 
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
-      participant1_id TEXT NOT NULL,
-      participant2_id TEXT NOT NULL,
+      participant1_id TEXT,
+      participant2_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (participant1_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (participant2_id) REFERENCES users(id) ON DELETE SET NULL,
       UNIQUE(participant1_id, participant2_id)
     );
 
@@ -215,11 +215,11 @@ if (isPostgresClient) {
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
-      sender_id TEXT NOT NULL,
+      sender_id TEXT,
       text TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at ASC);
@@ -243,6 +243,12 @@ if (isPostgresClient) {
 
     CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(is_active);
   `);
+
+  // Rebuild only the three messaging tables when opening an older local SQLite
+  // database. Rows are copied intact; deleting a user can then anonymize their
+  // references without cascading away the other participant's history.
+  const { migrateSqliteForAccountDeletion } = require('./account-deletion-sqlite-migration');
+  migrateSqliteForAccountDeletion(sqliteDb);
 
   const skillCols = sqliteDb.prepare("PRAGMA table_info(skills)").all().map(c => c.name);
   if (!skillCols.includes('category_id')) {

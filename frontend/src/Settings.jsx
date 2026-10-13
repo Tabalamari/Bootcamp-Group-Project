@@ -5,7 +5,7 @@ import { createSettingsService, validateEmailChange, validatePassword, validateS
 
 const emptyPasswords = () => ({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
-export default function Settings({ user, courses = [], onUpdated }) {
+export default function Settings({ user, courses = [], onUpdated, onDeleted }) {
   const service = useMemo(() => isDemo ? createSettingsService(courses) : settingsApi, [courses]);
   const [saved, setSaved] = useState(null);
   const [values, setValues] = useState(null);
@@ -23,6 +23,9 @@ export default function Settings({ user, courses = [], onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);
   const [failNext, setFailNext] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteValues, setDeleteValues] = useState({ currentPassword: '', confirmText: '' });
+  const [deleteFailure, setDeleteFailure] = useState('');
 
   async function load() {
     setFailure('');
@@ -112,6 +115,28 @@ export default function Settings({ user, courses = [], onUpdated }) {
     }
   }
 
+  async function deleteAccount(event) {
+    event.preventDefault();
+    setDeleteFailure('');
+    if (!deleteValues.currentPassword) {
+      setDeleteFailure('Enter your current password to continue.');
+      return;
+    }
+    if (deleteValues.confirmText !== 'DELETE') {
+      setDeleteFailure('Type DELETE exactly as shown to confirm permanent removal.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await service.deleteAccount(user, deleteValues);
+      onDeleted?.();
+    } catch (error) {
+      setDeleteFailure(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const dirty = values && saved && (values.displayName !== saved.displayName || values.courseId !== saved.courseId);
   return <section>
     <span className="eyebrow">MAKE YOURSELF AT HOME</span>
@@ -159,6 +184,16 @@ export default function Settings({ user, courses = [], onUpdated }) {
         </fieldset>
       </form>
     </div>}
+    {values && <section className="account-delete-card" aria-labelledby="delete-account-title">
+      <div><h2 id="delete-account-title">Delete account</h2><p>Permanently remove your login, profile, photo and account details. Existing conversation history stays visible to the other participant with your name and photo replaced by “Deleted User.”</p><p className="field-help">Messages you already sent remain in those conversations. They may still contain personal information you included in the message text.</p></div>
+      {isDemo ? <p className="field-help">Account deletion is unavailable in the sample preview.</p> : !showDelete ? <button type="button" className="danger-button" onClick={() => { setShowDelete(true); setDeleteFailure(''); }}>Delete account…</button> : <form onSubmit={deleteAccount} noValidate>
+        <div className="account-delete-warning"><strong>This cannot be undone.</strong><span>Your account and photo will be permanently removed, and you will be signed out. Your conversation partners keep their message history.</span></div>
+        <div className="field"><label htmlFor="delete-current-password">Current password</label><input id="delete-current-password" type="password" autoComplete="current-password" maxLength={128} value={deleteValues.currentPassword} onChange={event => setDeleteValues({ ...deleteValues, currentPassword: event.target.value })} /></div>
+        <div className="field"><label htmlFor="delete-confirm-text">Type DELETE to confirm</label><input id="delete-confirm-text" autoComplete="off" value={deleteValues.confirmText} onChange={event => setDeleteValues({ ...deleteValues, confirmText: event.target.value })} /></div>
+        {deleteFailure && <p className="error-banner" role="alert">{deleteFailure}</p>}
+        <div className="profile-actions"><button className="danger-button" disabled={busy}>{busy ? 'Deleting account…' : 'Permanently delete account'}</button><button type="button" className="secondary" disabled={busy} onClick={() => { setShowDelete(false); setDeleteValues({ currentPassword: '', confirmText: '' }); setDeleteFailure(''); }}>Cancel</button></div>
+      </form>}
+    </section>}
     {isDemo && <details className="message-demo-tools"><summary>Sample settings controls</summary><label className="option"><input type="checkbox" checked={failNext} onChange={event => setFailNext(event.target.checked)} />Make the next save fail to test retry</label></details>}
   </section>;
 }

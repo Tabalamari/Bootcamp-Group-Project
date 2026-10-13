@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS profile_goals (
 -- 12. Conversations (1-on-1 private messaging)
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
-  participant1_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  participant2_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  participant1_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  participant2_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(participant1_id, participant2_id)
@@ -109,7 +109,7 @@ CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
   conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   text TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

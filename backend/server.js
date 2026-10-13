@@ -879,6 +879,7 @@ function canonicalizeParticipants(userA, userB) {
 }
 
 async function getPublicUserSummary(userId) {
+  if (!userId) return null;
   const row = await db.prepare(`
     SELECT 
       users.id, 
@@ -912,7 +913,7 @@ async function getUnreadCount(conversationId, userId) {
 
   const countRow = await db.prepare(`
     SELECT COUNT(*) AS count FROM messages 
-    WHERE conversation_id = ? AND sender_id != ? AND created_at > ?
+    WHERE conversation_id = ? AND (sender_id IS NULL OR sender_id != ?) AND created_at > ?
   `).get(conversationId, userId, lastReadAt);
 
   return countRow ? Number(countRow.count) : 0;
@@ -950,7 +951,7 @@ async function formatConversation(conv, currentUserId) {
       displayName: otherUser.displayName,
       courseName: otherUser.courseName,
       photoUrl: otherUser.photoUrl
-    } : null,
+    } : { id: null, displayName: 'Deleted User', courseName: null, photoUrl: null, status: 'deleted' },
     lastMessage,
     unreadCount,
     updatedAt: conv.updated_at
@@ -994,67 +995,66 @@ app.post('/api/conversations', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Cannot start conversation with yourself' });
     }
 
-    const recipient = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(recipientId);
-    if (!recipient) {
-      return res.status(404).json({ error: 'Recipient user not found' });
-    }
-
-    if (recipient.status === 'suspended') {
-      return res.status(403).json({ error: 'This recipient is suspended and cannot be contacted' });
-    }
-
-    const [p1, p2] = canonicalizeParticipants(currentUserId, recipientId);
-    let conversation = await db.prepare(`
-      SELECT id, participant1_id, participant2_id, created_at, updated_at
-      FROM conversations
-      WHERE participant1_id = ? AND participant2_id = ?
-    `).get(p1, p2);
-
-    let isNew = false;
-    const now = new Date().toISOString();
-
-    if (!conversation) {
-      const convId = crypto.randomUUID();
-      await db.prepare(`
-        INSERT INTO conversations (id, participant1_id, participant2_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(convId, p1, p2, now, now);
-
-      conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(convId);
-      isNew = true;
-    }
-
-    // If an initial text message was provided in request body
+    let initialText;
     if (req.body.text !== undefined) {
       if (typeof req.body.text !== 'string' || !req.body.text.trim()) {
         return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
       }
-      const trimmed = req.body.text.trim();
-      if (trimmed.length > 2000) {
+      initialText = req.body.text.trim();
+      if (initialText.length > 2000) {
         return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
       }
-
-      const msgId = crypto.randomUUID();
-      const msgTime = new Date().toISOString();
-
-      await db.prepare(`
-        INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(msgId, conversation.id, currentUserId, trimmed, msgTime);
-
-      await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(msgTime, conversation.id);
-
-      await db.prepare(`
-        INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
-      `).run(conversation.id, currentUserId, msgTime, msgTime);
-
-      conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(conversation.id);
     }
 
-    const formatted = await formatConversation(conversation, currentUserId);
-    res.status(isNew ? 201 : 200).json({ conversation: formatted });
+    // Serialize new conversations with account deletion. On PostgreSQL, locking
+    // the recipient row means either the conversation is created before deletion
+    // or the request sees no recipient; a deleted account cannot receive a late
+    // initial message.
+    const startTx = db.transaction(async () => {
+      const lockClause = db.clientType === 'postgres' ? ' FOR UPDATE' : '';
+      const recipient = await db.prepare(`SELECT id, status FROM users WHERE id = ?${lockClause}`).get(recipientId);
+      if (!recipient) return { status: 404, error: 'Recipient user not found' };
+      if (recipient.status !== 'active') return { status: 403, error: 'This recipient cannot be contacted' };
+
+      const [p1, p2] = canonicalizeParticipants(currentUserId, recipientId);
+      let conversation = await db.prepare(`
+        SELECT id, participant1_id, participant2_id, created_at, updated_at
+        FROM conversations
+        WHERE participant1_id = ? AND participant2_id = ?
+      `).get(p1, p2);
+      let isNew = false;
+      const now = new Date().toISOString();
+      if (!conversation) {
+        const convId = crypto.randomUUID();
+        await db.prepare(`
+          INSERT INTO conversations (id, participant1_id, participant2_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(convId, p1, p2, now, now);
+        conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(convId);
+        isNew = true;
+      }
+
+      if (initialText !== undefined) {
+        const msgId = crypto.randomUUID();
+        const msgTime = new Date().toISOString();
+        await db.prepare(`
+          INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(msgId, conversation.id, currentUserId, initialText, msgTime);
+        await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(msgTime, conversation.id);
+        await db.prepare(`
+          INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+        `).run(conversation.id, currentUserId, msgTime, msgTime);
+        conversation = await db.prepare('SELECT id, participant1_id, participant2_id, created_at, updated_at FROM conversations WHERE id = ?').get(conversation.id);
+      }
+
+      return { status: isNew ? 201 : 200, conversation: await formatConversation(conversation, currentUserId) };
+    });
+    const result = await startTx();
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.status(result.status).json({ conversation: result.conversation });
   } catch (error) {
     res.status(500).json({ error: 'Failed to start or retrieve conversation' });
   }
@@ -1120,7 +1120,7 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
         displayName: otherUser.displayName,
         courseName: otherUser.courseName,
         photoUrl: otherUser.photoUrl
-      } : null,
+      } : { id: null, displayName: 'Deleted User', courseName: null, photoUrl: null, status: 'deleted' },
       messages: rows.map(m => ({
         id: m.id,
         conversationId: m.conversation_id,
@@ -1140,59 +1140,44 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
 app.post('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const conversation = await db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id);
-
-    if (!conversation) {
-      return res.status(404).json({ error: 'Conversation not found' });
-    }
-
-    // Server-enforced participant authorization check
-    if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
-      return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
-    }
-
-    // Check if recipient is suspended
-    const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
-    const recipient = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(otherUserId);
-
-    if (recipient && recipient.status === 'suspended') {
-      return res.status(403).json({ error: 'Recipient account is suspended and cannot receive messages' });
-    }
-
-    // Validate message text length (1 to 2000 chars)
     if (!req.body || typeof req.body.text !== 'string') {
       return res.status(400).json({ error: 'Message text is required' });
     }
-
     const trimmed = req.body.text.trim();
     if (trimmed.length < 1 || trimmed.length > 2000) {
       return res.status(400).json({ error: 'Message must be between 1 and 2000 characters' });
     }
+    const sendTx = db.transaction(async () => {
+      const lockClause = db.clientType === 'postgres' ? ' FOR UPDATE' : '';
+      const conversation = await db.prepare(`SELECT * FROM conversations WHERE id = ?${lockClause}`).get(req.params.id);
+      if (!conversation) return { status: 404, error: 'Conversation not found' };
+      if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+        return { status: 403, error: 'Access denied: you are not a participant in this conversation' };
+      }
 
-    const msgId = crypto.randomUUID();
-    const now = new Date().toISOString();
+      const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
+      if (!otherUserId) return { status: 410, error: 'This conversation is read-only because the other account was deleted' };
+      const recipient = await db.prepare('SELECT id, status FROM users WHERE id = ?').get(otherUserId);
+      if (!recipient) return { status: 410, error: 'This conversation is read-only because the other account was deleted' };
+      if (recipient.status !== 'active') return { status: 403, error: 'Recipient account cannot receive messages' };
 
-    await db.prepare(`
-      INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(msgId, conversation.id, currentUserId, trimmed, now);
-
-    await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversation.id);
-
-    // Update sender's read timestamp so their own message is not counted as unread
-    await db.prepare(`
-      INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
-    `).run(conversation.id, currentUserId, now, now);
-
-    res.status(201).json({
-      id: msgId,
-      conversationId: conversation.id,
-      senderId: currentUserId,
-      text: trimmed,
-      createdAt: now
+      const msgId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await db.prepare(`
+        INSERT INTO messages (id, conversation_id, sender_id, text, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(msgId, conversation.id, currentUserId, trimmed, now);
+      await db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversation.id);
+      await db.prepare(`
+        INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+      `).run(conversation.id, currentUserId, now, now);
+      return { status: 201, payload: { id: msgId, conversationId: conversation.id, senderId: currentUserId, text: trimmed, createdAt: now } };
     });
+    const result = await sendTx();
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.status(result.status).json(result.payload);
   } catch (error) {
     res.status(500).json({ error: 'Failed to send message' });
   }
@@ -1981,6 +1966,110 @@ app.post('/api/account/password', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
+// Permanently delete the authenticated account after password reauthentication
+// and an explicit typed confirmation. Existing conversations/messages are
+// retained by SET NULL foreign keys; the deleting user's sessions/profile data
+// cascade away with their users row.
+app.delete('/api/account', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    if (db.clientType === 'postgres') {
+      const references = await db.prepare(`
+        SELECT tc.table_name, kcu.column_name, rc.delete_rule, c.is_nullable
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          USING (constraint_catalog, constraint_schema, constraint_name, table_schema, table_name)
+        JOIN information_schema.referential_constraints rc
+          USING (constraint_catalog, constraint_schema, constraint_name)
+        JOIN information_schema.columns c
+          USING (table_schema, table_name, column_name)
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND tc.table_schema = 'public'
+          AND ((tc.table_name = 'conversations' AND kcu.column_name IN ('participant1_id', 'participant2_id'))
+            OR (tc.table_name = 'messages' AND kcu.column_name = 'sender_id'))
+      `).all();
+      const { hasSafeAccountDeletionSchema } = require('./account-deletion-schema');
+      if (!hasSafeAccountDeletionSchema(references)) {
+        return res.status(503).json({ error: 'Account deletion is temporarily unavailable until the database migration is applied. Your account and conversations were not changed.' });
+      }
+    }
+
+    const now = Date.now();
+    const attemptRecord = passwordAttemptLimiter.get(userId);
+    if (attemptRecord) {
+      if (now - attemptRecord.firstAttemptTime > RATE_LIMIT_WINDOW_MS) {
+        passwordAttemptLimiter.delete(userId);
+      } else if (attemptRecord.count >= MAX_PASSWORD_ATTEMPTS) {
+        return res.status(429).json({ error: 'Too many failed password attempts. Please try again later.' });
+      }
+    }
+
+    const { currentPassword, confirmText } = req.body || {};
+    if (typeof currentPassword !== 'string' || !currentPassword || confirmText !== 'DELETE') {
+      return res.status(400).json({ error: 'Enter your current password and type DELETE to confirm account removal.' });
+    }
+    const user = await db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'User account not found.' });
+    if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+      const attempts = passwordAttemptLimiter.get(userId) || { count: 0, firstAttemptTime: now };
+      attempts.count += 1;
+      passwordAttemptLimiter.set(userId, attempts);
+      return res.status(401).json({ error: 'The current password is incorrect.' });
+    }
+
+    const profile = await db.prepare('SELECT photo_url FROM profiles WHERE user_id = ?').get(userId);
+    const photoUrl = profile?.photo_url || null;
+    try {
+      if (photoUrl) {
+        if (photoStorage) {
+          const objectKey = photoStorage.objectKeyFromUrl(photoUrl);
+          if (!objectKey || !objectKey.startsWith(`${userId}/`) || objectKey.split('/').includes('..')) {
+            throw new Error('Stored profile photo is not owned by this account');
+          }
+          await photoStorage.remove(objectKey);
+        } else if (photoUrl.startsWith('/uploads/')) {
+          const relativeName = photoUrl.slice('/uploads/'.length);
+          const filename = path.basename(relativeName);
+          const filePath = path.resolve(uploadsDir, filename);
+          if (!filename || filename !== relativeName || !filePath.startsWith(`${path.resolve(uploadsDir)}${path.sep}`)) {
+            throw new Error('Stored profile photo path is invalid');
+          }
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } else {
+          throw new Error('Stored profile photo cannot be safely identified');
+        }
+      }
+    } catch (error) {
+      console.error('[Account deletion] Profile photo cleanup failed');
+      return res.status(503).json({ error: 'Your photo could not be safely removed, so your account was not deleted. Please try again.' });
+    }
+
+    const deleteTx = db.transaction(async () => {
+      const lockClause = db.clientType === 'postgres' ? ' FOR UPDATE' : '';
+      const latestProfile = await db.prepare(`SELECT photo_url FROM profiles WHERE user_id = ?${lockClause}`).get(userId);
+      if ((latestProfile?.photo_url || null) !== photoUrl) return 'photo-changed';
+      const exists = await db.prepare(`SELECT id FROM users WHERE id = ?${lockClause}`).get(userId);
+      if (!exists) return 'missing';
+      await db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+      // Once both participants have deleted their accounts, no remaining user
+      // needs this thread. Purge those fully orphaned histories in the same tx.
+      await db.prepare('DELETE FROM conversations WHERE participant1_id IS NULL AND participant2_id IS NULL').run();
+      return 'deleted';
+    });
+    const result = await deleteTx();
+    if (result === 'photo-changed') {
+      return res.status(409).json({ error: 'Your profile photo changed during deletion. Please retry account removal.' });
+    }
+    if (result === 'missing') return res.status(404).json({ error: 'User account not found.' });
+
+    passwordAttemptLimiter.delete(userId);
+    return res.status(204).end();
+  } catch (error) {
+    console.error('[Account deletion] Account cleanup failed');
+    return res.status(500).json({ error: 'Your account could not be deleted. Please try again.' });
   }
 });
 

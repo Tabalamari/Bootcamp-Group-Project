@@ -1,4 +1,4 @@
-# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04, FR-05 & FR-06)
+# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04, FR-05, FR-06 & Account Deletion)
 
 Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
@@ -7,6 +7,7 @@ Backend implementation for Bootcamp Connect core features:
 - **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking).
 - **FR-05:** Administration (admin workspace data, taxonomy & category management, soft deactivation, duplicate prevention, learner course correction, session revocation upon suspension, strict privacy isolation for student chats).
 - **FR-06:** Account settings (authenticated name and course updates, password changes with reauthentication, session revocation policy, rate-limited attempts).
+- **Account deletion:** Password-confirmed permanent deletion of credentials, profile, sessions, and owned photo; existing chats are retained and anonymized for the remaining participant.
 
 **Owner:** Marianna  
 **Stack:** Node.js, Express.js, PostgreSQL (Supabase) or SQLite (local/test), Supabase Storage, `multer`, `bcryptjs`, Bearer Token (UUID)
@@ -35,6 +36,10 @@ SQLite development photos are served from `/uploads`. In production, configure `
 
 For a new Supabase project, apply `supabase-schema.sql` and then `supabase-seed.sql` in the Supabase SQL Editor. Copy the Session pooler connection string from the dashboard's **Connect** panel when connecting from an IPv4-only network; do not compose its host by hand. Download the database root certificate from **Database Settings → SSL Configuration**, save it as `backend/supabase-ca.crt`, and set `DATABASE_SSL_CA_PATH=./supabase-ca.crt`. The backend and migration scripts keep certificate verification enabled and use this CA to verify the database connection.
 
+For an existing Supabase database, apply `migrations/account-deletion-postgres.sql` before deploying account deletion. The migration makes conversation participants and message senders nullable with `ON DELETE SET NULL`; it preserves current rows and ensures the remaining participant can still read the thread. For local SQLite databases, the backend copies the existing conversations, messages, and read markers into the updated schema on startup, then checks foreign-key integrity. Back up the database before upgrading as a normal precaution.
+
+Message text remains available to the other participant after account removal and may contain information the sender wrote in the text. The app removes the sender's account identity, name and photo from the conversation metadata; it does not attempt to rewrite historical message bodies.
+
 For an existing SQLite project, keep a backup of both `database.sqlite` and `uploads/`, set `DB_CLIENT=postgres` and `DATABASE_URL`, then run:
 
 ```bash
@@ -50,13 +55,14 @@ Backend API tests use an in-memory SQLite database even when `backend/.env` cont
 ```bash
 npm test
 ```
-The API suite runs 72 automated checks verifying the following. The command also runs four unit checks for Supabase Storage URL, upload, deletion, and error behavior in `photo-storage.test.js`:
+The API suite runs 83 automated checks verifying the following. The command also runs unit checks for the PostgreSQL deletion-schema guard, SQLite account-deletion migration behavior, Supabase Storage URL, upload, deletion, error behavior, and PostgreSQL SSL configuration:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
 - All 10 FR-04 acceptance criteria (start conversation and send 1-2000 chars text, conversation deduplication, self-messaging prohibition, server-enforced 2-participant isolation, chronological order with sender/timestamp, persistent storage across sessions, inbox preview with unread count, draft preservation on validation errors, suspended account blocking for senders and recipients, manual refresh compatibility).
 - All 8 FR-05 acceptance criteria (admin role-based access control with 401/403 enforcement, workspace state hydration, taxonomy category management, duplicate validation across case/whitespace, safe deactivation without physical deletion, immediate session revocation upon suspension, learner course correction, and privacy protection excluding private messages from admin inspection).
 - All FR-06 acceptance criteria (authenticated account settings inspection, display name and active course updates, empty and length validation, current-password reauthentication, password length and non-identity rules, subsequent login with new password and old password rejection, auxiliary session revocation, and rate limiting).
+- Account deletion checks with two authenticated chat accounts and an unrelated account, verifying the password and final confirmation, profile/photo/session removal, deleted-user chat labeling, preserved message history, blocked new messages and login, and protection of unrelated accounts.
 
 ---
 
@@ -556,7 +562,16 @@ All administrator endpoints require an active session belonging to a user with `
     }
     ```
 
-#### 28. Change Login Email with Reauthentication (Protected)
+#### 28. Permanently Delete Account (Protected)
+- **`DELETE /api/account`**
+  - **Header:** `Authorization: Bearer <token>`
+  - **Request Body (JSON):** `{ "currentPassword": "CurrentPassword123!", "confirmText": "DELETE" }`
+  - Requires the current password, the exact typed confirmation, and rate-limits repeated password failures.
+  - Removes the account photo before deleting the account row. If the photo cannot be safely removed, deletion stops and the account remains.
+  - **Success:** `204 No Content`. Sessions, profile fields, and profile option links cascade away with the user.
+  - Existing conversation rows and message text remain. The deleted user's conversation and sender references become `NULL`, so the other participant sees “Deleted User” without a photo. That conversation is read-only (`410 Gone`) after deletion.
+
+#### 29. Change Login Email with Reauthentication (Protected)
 - **`POST /api/account/email`**
   - **Header:** `Authorization: Bearer <token>`
   - **Request Body (JSON):**
@@ -588,6 +603,6 @@ The `database.sqlite` file is created and migrated automatically:
 9. **`profile_skills`**: `(user_id, skill_id)` (PK, FKs).
 10. **`profile_interests`**: `(user_id, interest_id)` (PK, FKs).
 11. **`profile_goals`**: `(user_id, goal_id)` (PK, FKs).
-12. **`conversations`**: `id` (TEXT, PK), `participant1_id` (TEXT, FK), `participant2_id` (TEXT, FK), `created_at` (DATETIME), `updated_at` (DATETIME), `UNIQUE(participant1_id, participant2_id)`.
-13. **`messages`**: `id` (TEXT, PK), `conversation_id` (TEXT, FK), `sender_id` (TEXT, FK), `text` (TEXT), `created_at` (DATETIME).
+12. **`conversations`**: `id` (TEXT, PK), nullable participant IDs (FKs with `ON DELETE SET NULL`), `created_at` (DATETIME), `updated_at` (DATETIME), `UNIQUE(participant1_id, participant2_id)`.
+13. **`messages`**: `id` (TEXT, PK), `conversation_id` (TEXT, FK), nullable `sender_id` (FK with `ON DELETE SET NULL`), `text` (TEXT), `created_at` (DATETIME).
 14. **`conversation_reads`**: `(conversation_id, user_id)` (PK, FKs), `last_read_at` (DATETIME).

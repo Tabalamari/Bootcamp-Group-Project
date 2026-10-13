@@ -1,6 +1,6 @@
 /**
  * Automated test suite for Marianna's backend requirements and Qingling's criteria
- * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), FR-04 (Private Messaging), FR-05 (Administration), and FR-06 (Account Settings)
+ * Covers FR-01 (Authentication & Courses), FR-02 (User Profiles), FR-03 (Search & Explainable Fit), FR-04 (Private Messaging), FR-05 (Administration), FR-06 (Account Settings), and secure account deletion.
  * Usage: npm test
  */
 
@@ -1502,6 +1502,98 @@ async function runTests() {
       'TEST 74: New email becomes the login, old email stops working, current session stays active and other sessions are revoked'
     );
 
+    // Account deletion uses three isolated test accounts and an ephemeral local
+    // photo file. This suite is pinned to in-memory SQLite and never uses Supabase.
+    const deletePassword = 'DeleteAccountTest123!';
+    async function registerDeleteTestAccount(name, email) {
+      const response = await fetch(`${baseUrl}/auth/register`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: name, email, password: deletePassword, courseId: 'software-dev' })
+      });
+      return { response, data: await response.json() };
+    }
+    const [deleteOwner, deletePeer, unrelatedAccount] = await Promise.all([
+      registerDeleteTestAccount('Private Delete Owner', 'test_delete_owner_2026@example.com'),
+      registerDeleteTestAccount('Conversation Peer', 'test_delete_peer_2026@example.com'),
+      registerDeleteTestAccount('Unrelated Member', 'test_delete_unrelated_2026@example.com')
+    ]);
+    const deleteOwnerToken = deleteOwner.data.token;
+    const deletePeerToken = deletePeer.data.token;
+    const unrelatedToken = unrelatedAccount.data.token;
+    const photoFilename = `test-delete-account-${crypto.randomBytes(8).toString('hex')}.png`;
+    const photoPath = path.join(__dirname, 'uploads', photoFilename);
+    fs.writeFileSync(photoPath, 'temporary account deletion test photo');
+    await db.prepare('UPDATE profiles SET bio = ?, photo_url = ? WHERE user_id = ?').run(
+      'Private bio', `/uploads/${photoFilename}`, deleteOwner.data.user.id
+    );
+    await db.prepare('INSERT INTO profile_skills (user_id, skill_id) VALUES (?, ?)').run(deleteOwner.data.user.id, 'react');
+
+    const createDeleteConversation = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deleteOwnerToken}` },
+      body: JSON.stringify({ recipientId: deletePeer.data.user.id, text: 'A message that must remain visible.' })
+    });
+    const createdDeleteConversation = await createDeleteConversation.json();
+    const deleteConversationId = createdDeleteConversation.conversation.id;
+    const peerReply = await fetch(`${baseUrl}/conversations/${deleteConversationId}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deletePeerToken}` },
+      body: JSON.stringify({ text: 'The other participant keeps this reply.' })
+    });
+    assert(deleteOwner.response.status === 201 && deletePeer.response.status === 201 && unrelatedAccount.response.status === 201 && peerReply.status === 201,
+      'TEST 75: Create two authenticated chat accounts, one unrelated account, and a two-message conversation');
+
+    const missingFinalConfirmation = await fetch(`${baseUrl}/account`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deleteOwnerToken}` },
+      body: JSON.stringify({ currentPassword: deletePassword, confirmText: 'delete' })
+    });
+    const wrongDeletePassword = await fetch(`${baseUrl}/account`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deleteOwnerToken}` },
+      body: JSON.stringify({ currentPassword: 'WrongDeletePassword123!', confirmText: 'DELETE' })
+    });
+    assert(missingFinalConfirmation.status === 400 && wrongDeletePassword.status === 401,
+      'TEST 76: Account deletion requires the exact final warning and a correct current password');
+
+    const deleteOwnerId = deleteOwner.data.user.id;
+    const deleteAccountResponse = await fetch(`${baseUrl}/account`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deleteOwnerToken}` },
+      body: JSON.stringify({ currentPassword: deletePassword, confirmText: 'DELETE' })
+    });
+    const [deletedLogin, deletedSession, peerInbox, unrelatedSession] = await Promise.all([
+      fetch(`${baseUrl}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'test_delete_owner_2026@example.com', password: deletePassword }) }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${deleteOwnerToken}` } }),
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${deletePeerToken}` } }),
+      fetch(`${baseUrl}/auth/me`, { headers: { Authorization: `Bearer ${unrelatedToken}` } })
+    ]);
+    const peerInboxData = await peerInbox.json();
+    const preservedConversation = peerInboxData.conversations.find(item => item.id === deleteConversationId);
+    const preservedHistoryResponse = await fetch(`${baseUrl}/conversations/${deleteConversationId}/messages`, {
+      headers: { Authorization: `Bearer ${deletePeerToken}` }
+    });
+    const preservedHistory = await preservedHistoryResponse.json();
+    const sendToDeletedAccount = await fetch(`${baseUrl}/conversations/${deleteConversationId}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deletePeerToken}` },
+      body: JSON.stringify({ text: 'This message must not be accepted.' })
+    });
+    const ownerRow = await db.prepare('SELECT id FROM users WHERE id = ?').get(deleteOwnerId);
+    const ownerProfile = await db.prepare('SELECT user_id FROM profiles WHERE user_id = ?').get(deleteOwnerId);
+    const ownerSkillLinks = await db.prepare('SELECT user_id FROM profile_skills WHERE user_id = ?').all(deleteOwnerId);
+    const ownerSessions = await db.prepare('SELECT token FROM sessions WHERE user_id = ?').all(deleteOwnerId);
+    const conversationAfterDelete = await db.prepare('SELECT participant1_id, participant2_id FROM conversations WHERE id = ?').get(deleteConversationId);
+    const messageRowsAfterDelete = await db.prepare('SELECT sender_id, text FROM messages WHERE conversation_id = ? ORDER BY created_at, id').all(deleteConversationId);
+    const unrelatedRow = await db.prepare('SELECT id FROM users WHERE id = ?').get(unrelatedAccount.data.user.id);
+
+    assert(deleteAccountResponse.status === 204 && deletedLogin.status === 401 && deletedSession.status === 401,
+      'TEST 77: Successful deletion removes the account and sessions, and blocks both login and its old token');
+    assert(!ownerRow && !ownerProfile && ownerSkillLinks.length === 0 && ownerSessions.length === 0 && !fs.existsSync(photoPath),
+      'TEST 78: Deletion removes the selected account, profile, profile options, sessions, and local photo file');
+    assert(preservedConversation?.otherParticipant?.id === null && preservedConversation.otherParticipant.displayName === 'Deleted User' && preservedConversation.otherParticipant.photoUrl === null,
+      'TEST 79: The remaining participant sees a Deleted User placeholder with no former photo or name');
+    assert(preservedHistoryResponse.status === 200 && preservedHistory.messages.length === 2 && preservedHistory.messages[0].senderId === null && preservedHistory.messages[1].senderId === deletePeer.data.user.id,
+      'TEST 80: Both sides of the conversation remain, with the deleted sender anonymized');
+    assert(sendToDeletedAccount.status === 410 && messageRowsAfterDelete.length === 2,
+      'TEST 81: A preserved conversation is read-only after deletion and a new message is not stored');
+    assert(conversationAfterDelete && Object.values(conversationAfterDelete).includes(deletePeer.data.user.id) && Object.values(conversationAfterDelete).includes(null) && unrelatedRow && unrelatedSession.status === 200,
+      'TEST 82: The peer and unrelated user remain intact; only the deleted participant reference is cleared');
+
   } catch (err) {
     console.error('Error during test execution:', err);
     failed++;
@@ -1510,6 +1602,13 @@ async function runTests() {
     await db.prepare("DELETE FROM users WHERE email LIKE 'test%@example.com'").run();
     await db.prepare("DELETE FROM skills WHERE id LIKE 'figma%' OR id LIKE 'advanced-figma%' OR id LIKE 'admin-%'").run();
     await db.prepare("DELETE FROM categories WHERE id LIKE 'product-%'").run();
+
+    const uploadsPath = path.join(__dirname, 'uploads');
+    if (fs.existsSync(uploadsPath)) {
+      for (const filename of fs.readdirSync(uploadsPath)) {
+        if (filename.startsWith('test-delete-account-')) fs.rmSync(path.join(uploadsPath, filename), { force: true });
+      }
+    }
 
     if (db.close) await db.close();
     server.close();

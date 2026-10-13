@@ -26,8 +26,9 @@ async function request(path, options = {}) {
 }
 
 function mapConversation(conversation) {
-  const person = conversation.otherParticipant;
-  const previous = conversations.find(item => item.person.id === person.id);
+  const rawPerson = conversation.otherParticipant || { id: null, displayName: 'Deleted User', courseName: null, photoUrl: null };
+  const person = { ...rawPerson, status: rawPerson.id === null ? 'deleted' : 'active' };
+  const previous = conversations.find(item => item.id === conversation.id);
   return {
     id: conversation.id,
     person: {
@@ -52,9 +53,9 @@ async function list(userId) {
   return structuredClone(conversations);
 }
 
-function getConversation(userId, personId) {
+function getConversation(userId, conversationId) {
   if (ownerId !== userId) throw new Error('Refresh your inbox and try again.');
-  const conversation = conversations.find(item => item.person.id === personId);
+  const conversation = conversations.find(item => item.id === conversationId);
   if (!conversation) throw new Error('Conversation unavailable. Refresh your inbox and try again.');
   return conversation;
 }
@@ -70,42 +71,42 @@ export const messageApi = {
       body: JSON.stringify({ recipientId: personId }),
     });
     await list(userId);
-    return data.conversation.otherParticipant.id;
+    return data.conversation.id;
   },
-  async history(userId, personId) {
-    const conversation = getConversation(userId, personId);
+  async history(userId, conversationId) {
+    const conversation = getConversation(userId, conversationId);
     const data = await request(`/conversations/${encodeURIComponent(conversation.id)}/messages`);
     const latest = conversations.find(item => item.id === data.conversationId);
     if (!latest) return [];
     latest.messages = data.messages.map(message => ({
       id: message.id,
-      sender: message.senderId === userId ? 'you' : personId,
+      sender: message.senderId === userId ? 'you' : 'other',
       text: message.text,
       createdAt: message.createdAt,
     }));
     notify();
     return structuredClone(latest.messages);
   },
-  async read(_userId, personId) {
-    const conversation = getConversation(_userId, personId);
+  async read(_userId, conversationId) {
+    const conversation = getConversation(_userId, conversationId);
     if (!conversation.unread) return;
     await request(`/conversations/${encodeURIComponent(conversation.id)}/read`, { method: 'POST' });
     conversation.unread = 0;
     notify();
   },
-  draft(userId, personId) { return drafts.get(draftKey(userId, personId)) || ''; },
-  saveDraft(userId, personId, text) { drafts.set(draftKey(userId, personId), text); },
-  async send(userId, personId, text) {
+  draft(userId, conversationId) { return drafts.get(draftKey(userId, conversationId)) || ''; },
+  saveDraft(userId, conversationId, text) { drafts.set(draftKey(userId, conversationId), text); },
+  async send(userId, conversationId, text) {
     const trimmed = text.trim();
     if (!trimmed || trimmed.length > 2000) throw new Error('Write a message between 1 and 2,000 characters.');
-    const conversation = getConversation(userId, personId);
+    const conversation = getConversation(userId, conversationId);
     await request(`/conversations/${encodeURIComponent(conversation.id)}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: trimmed }),
     });
-    drafts.delete(draftKey(userId, personId));
+    drafts.delete(draftKey(userId, conversationId));
     await list(userId);
-    await this.history(userId, personId);
+    await this.history(userId, conversationId);
   },
 };

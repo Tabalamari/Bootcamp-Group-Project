@@ -52,6 +52,13 @@ export function createSettingsApi({ base = defaultBase, storage = globalThis.win
         currentPassword: values.currentPassword,
       });
     },
+    async deleteAccount(_user, values) {
+      await request('/account', 'DELETE', {
+        currentPassword: values.currentPassword,
+        confirmText: values.confirmText,
+      });
+      storage?.removeItem('bootcamp-connect-token');
+    },
   };
 }
 
