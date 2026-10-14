@@ -167,7 +167,7 @@ async function getUserProfile(userId) {
 // Basic health and info route
 app.get('/api', (req, res) => {
   res.json({
-    name: 'Bootcamp Connect API',
+    name: 'SkillBridge API',
     status: 'online',
     version: '1.0.0',
     dbClient: db.clientType || 'postgres'

@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Fictional test fixtures for Bootcamp Connect (verification). All people, emails and passwords are invented; passwords are for test use only.",
+    "description": "Fictional test fixtures for SkillBridge (verification). All people, emails and passwords are invented; passwords are for test use only.",
     "assumptions": [
       "Skill, interest, goal and active/inactive values are placeholders; replace with backend seed vocabulary (GET /api/profile-options).",
       "Course IDs software-dev and business-dev come from TEAM_ASSIGNMENTS.md.",

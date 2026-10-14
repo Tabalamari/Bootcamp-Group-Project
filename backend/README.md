@@ -1,6 +1,6 @@
-# Backend: Bootcamp Connect (FR-01, FR-02, FR-03, FR-04, FR-05, FR-06 & Account Deletion)
+# Backend: SkillBridge (FR-01, FR-02, FR-03, FR-04, FR-05, FR-06 & Account Deletion)
 
-Backend implementation for Bootcamp Connect core features:
+Backend implementation for SkillBridge core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
 - **FR-02:** User profiles, options vocabulary, profile viewing/editing, photo uploads/removal, and community profiles.
 - **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.

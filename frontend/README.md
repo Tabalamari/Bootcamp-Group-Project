@@ -1,4 +1,4 @@
-# Bootcamp Connect frontend
+# SkillBridge frontend
 
 Malak's frontend features: registration, course selection, login, welcome screen, logout, and profile viewing/editing with photo controls. React + JavaScript, Vite, and Tailwind CSS. Responsive desktop, laptop and mobile layouts follow the approved blue mockup.
 

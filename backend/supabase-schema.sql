@@ -1,5 +1,5 @@
 -- =========================================================
--- Bootcamp Connect - Supabase PostgreSQL Schema (DDL)
+-- SkillBridge - Supabase PostgreSQL Schema (DDL)
 -- =========================================================
 
 -- 1. Courses directory

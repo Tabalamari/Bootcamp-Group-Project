@@ -1,4 +1,4 @@
-# Bootcamp Connect - Product Requirements Document
+# SkillBridge - Product Requirements Document
 
 Date: 1 October 2026  
 Status: Draft for implementation  
@@ -6,7 +6,7 @@ Source: `1-october-weekly-goals.pdf`, TechNative Digital
 
 ## 1. Product overview
 
-Bootcamp Connect helps software development and business development learners find people with complementary skills, shared interests, and compatible goals. Connections may lead to project collaborations, co-founder partnerships, peer support, or friendships.
+SkillBridge helps software development and business development learners find people with complementary skills, shared interests, and compatible goals. Connections may lead to project collaborations, co-founder partnerships, peer support, or friendships.
 
 The initial product is a web application for the bootcamp community. Its core journey is: create an account, build a profile, discover a relevant person, understand why they might be a good fit, and start a private conversation.
 

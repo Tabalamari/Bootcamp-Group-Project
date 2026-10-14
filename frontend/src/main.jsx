@@ -71,7 +71,7 @@ function App() {
     window.addEventListener('hashchange', navigate);
     return () => window.removeEventListener('hashchange', navigate);
   }, []);
-  useEffect(() => { if (ready) document.title = `${user ? 'Welcome' : registering ? 'Join the community' : 'Sign in'} · Bootcamp Connect`; }, [ready, user, registering]);
+  useEffect(() => { if (ready) document.title = `${user ? 'Welcome' : registering ? 'Join the community' : 'Sign in'} · SkillBridge`; }, [ready, user, registering]);
 
   function change(event) {
     const { name, value } = event.target;
@@ -107,7 +107,7 @@ function App() {
 
   return <div className="min-h-screen bg-[#f3f7fd] text-[#183252]">
     <header className="site-header flex flex-wrap items-center justify-between gap-4">
-      <a className="brand flex items-center gap-3" href={user ? '#welcome' : '#register'} aria-label="Bootcamp Connect home"><span className="brand-mark">bc</span><span>bootcamp connect</span></a>
+      <a className="brand flex items-center gap-3" href={user ? '#welcome' : '#register'} aria-label="SkillBridge home"><img className="brand-mark" src="/favicon.svg" alt="" width="40" height="40"/><span>SkillBridge</span></a>
       {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span><Avatar photo={profilePhoto} name={user.displayName} /></a><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
@@ -130,11 +130,11 @@ function App() {
                 <button className="primary w-full" disabled={busy || (registering && !courses.length)}>{busy ? (registering ? 'Creating your account…' : 'Signing in…') : registering ? 'Create account →' : 'Sign in →'}</button>
               </fieldset>
             </form>
-            <p className="switch-page">{registering ? 'Already part of the community?' : 'New to Bootcamp Connect?'} <a href={registering ? '#login' : '#register'} onClick={() => setMessage('')}>{registering ? 'Sign in' : 'Create an account'}</a></p>
+            <p className="switch-page">{registering ? 'Already part of the community?' : 'New to SkillBridge?'} <a href={registering ? '#login' : '#register'} onClick={() => setMessage('')}>{registering ? 'Sign in' : 'Create an account'}</a></p>
             {isDemo && !registering && <div className="demo-details"><strong>Try the sample account</strong><span>malak@example.com</span><span>Password: DemoPass123!</span></div>}
           </section>
         </div>}
-    </main></div><footer className="site-footer">Bootcamp Connect <span>Learn together. Build together.</span></footer>
+    </main></div><footer className="site-footer">SkillBridge <span>Learn together. Build together.</span></footer>
   </div>;
 }
 

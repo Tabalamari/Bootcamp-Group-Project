@@ -1,6 +1,6 @@
-# Bootcamp Connect
+# SkillBridge
 
-Bootcamp Connect is a community platform for software-development and business-development learners. It helps people connect across courses, discover peers with complementary skills and interests, and continue conversations as they collaborate, mentor one another, and build professional relationships. The responsive app is designed for laptop, desktop, and mobile use.
+SkillBridge is a community platform for software-development and business-development learners. It helps people connect across courses, discover peers with complementary skills and interests, and continue conversations as they collaborate, mentor one another, and build professional relationships. The responsive app is designed for laptop, desktop, and mobile use.
 
 ## Features
 

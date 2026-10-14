@@ -1,4 +1,4 @@
-# Bootcamp Connect - Team Assignments and Feature Tracker
+# SkillBridge - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
 Last updated: 14 October 2026
