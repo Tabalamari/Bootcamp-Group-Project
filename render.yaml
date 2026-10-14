@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bootcamp-connect-staging
+    name: skillbridge-staging
     runtime: docker
     plan: free
     region: frankfurt
