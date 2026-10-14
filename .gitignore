@@ -15,6 +15,7 @@ dist/
 .env
 .env.local
 .env.test
+supabase-ca.crt
 
 # Local databases and uploads
 database.sqlite
@@ -36,3 +37,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# BRAG and video rendering
+brag.mp4
+brag-output/
+brag-output*/
+brag-output 1/
+composition/
+.venv/
+.agents/
+skills-lock.json
