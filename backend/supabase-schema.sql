@@ -124,6 +124,15 @@ CREATE TABLE IF NOT EXISTS conversation_reads (
   PRIMARY KEY (conversation_id, user_id)
 );
 
+-- 15. Per-user inbox deletion. Hiding one user's copy never removes shared messages.
+CREATE TABLE IF NOT EXISTS conversation_hides (
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  hidden_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reopened_at TIMESTAMPTZ,
+  PRIMARY KEY (conversation_id, user_id)
+);
+
 -- The application accesses these tables through the Express backend. Enable RLS
 -- so Supabase's public Data API roles cannot read user or messaging data directly.
 -- The backend's server-side database connection uses its privileged connection role.

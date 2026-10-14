@@ -234,6 +234,16 @@ if (isPostgresClient) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS conversation_hides (
+      conversation_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      hidden_at DATETIME NOT NULL,
+      reopened_at DATETIME DEFAULT NULL,
+      PRIMARY KEY (conversation_id, user_id),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
@@ -249,6 +259,11 @@ if (isPostgresClient) {
   // references without cascading away the other participant's history.
   const { migrateSqliteForAccountDeletion } = require('./account-deletion-sqlite-migration');
   migrateSqliteForAccountDeletion(sqliteDb);
+
+  const conversationHideCols = sqliteDb.prepare('PRAGMA table_info(conversation_hides)').all().map(c => c.name);
+  if (!conversationHideCols.includes('reopened_at')) {
+    sqliteDb.exec('ALTER TABLE conversation_hides ADD COLUMN reopened_at DATETIME DEFAULT NULL');
+  }
 
   const skillCols = sqliteDb.prepare("PRAGMA table_info(skills)").all().map(c => c.name);
   if (!skillCols.includes('category_id')) {

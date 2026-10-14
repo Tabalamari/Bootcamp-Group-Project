@@ -19,19 +19,26 @@ export function createMessageService() {
     const person = samplePeople.find(p => p.id === personId && p.status === 'active');
     if (!person || personId === userId) throw new Error('This person cannot be contacted.');
     const data = account(userId);
-    if (!data.chats.some(c => c.person.id === personId)) data.chats.unshift({ person: structuredClone(person), messages: [], unread: 0 });
+    if (!data.chats.some(c => c.person.id === personId)) data.chats.unshift({ person: structuredClone(person), messages: [], unread: 0, hidden: false });
+    else data.chats.find(c => c.person.id === personId).hidden = false;
     notify();
     return personId;
   }
   return {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    list(userId) { return structuredClone(account(userId).chats.filter(chat => chat.messages.length > 0)).sort((a,b) => (b.messages.at(-1)?.order || 0) - (a.messages.at(-1)?.order || 0)); },
+    list(userId) { return structuredClone(account(userId).chats.filter(chat => chat.messages.length > 0 && !chat.hidden)).sort((a,b) => (b.messages.at(-1)?.order || 0) - (a.messages.at(-1)?.order || 0)); },
     open,
     pending(userId, personId) {
       const conversation = account(userId).chats.find(item => item.person.id === personId && item.messages.length === 0);
       return conversation ? structuredClone(conversation) : null;
     },
     read(userId, personId) { const c = chat(userId, personId); if (c.unread) { c.unread = 0; notify(); } },
+    hide(userId, personId) {
+      const c = chat(userId, personId);
+      c.hidden = true;
+      delete account(userId).drafts[personId];
+      notify();
+    },
     draft(userId, personId) { return account(userId).drafts[personId] || ''; },
     saveDraft(userId, personId, text) { account(userId).drafts[personId] = text; },
     async send(userId, personId, text, fail = false) {
@@ -46,6 +53,7 @@ export function createMessageService() {
     simulateIncoming(userId, personId = 'sample-amara') {
       open(userId, personId);
       const c = chat(userId, personId);
+      c.hidden = false;
       c.messages.push({ id: `message-${++sequence}`, order: sequence, sender: personId, text: 'Hi! Would you like to share ideas for a bootcamp project?', createdAt: new Date().toISOString() });
       c.unread++;
       notify();

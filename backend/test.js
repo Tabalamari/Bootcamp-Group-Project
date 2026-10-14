@@ -1575,6 +1575,71 @@ async function runTests() {
     assert(deleteOwner.response.status === 201 && deletePeer.response.status === 201 && unrelatedAccount.response.status === 201 && peerReply.status === 201,
       'TEST 75: Create two authenticated chat accounts, one unrelated account, and a two-message conversation');
 
+    const hideConversationResponse = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deletePeerToken}` },
+      body: JSON.stringify({ recipientId: unrelatedAccount.data.user.id, text: 'This chat can be hidden for one user.' })
+    });
+    const hideConversationId = (await hideConversationResponse.json()).conversation.id;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const unauthorizedHide = await fetch(`${baseUrl}/conversations/${hideConversationId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${deleteOwnerToken}` }
+    });
+    const hideForMeResponse = await fetch(`${baseUrl}/conversations/${hideConversationId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${deletePeerToken}` }
+    });
+    const [hiddenPeerInboxResponse, unchangedOtherInboxResponse, preservedHiddenHistoryResponse, hiddenPeerHistoryResponse] = await Promise.all([
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${deletePeerToken}` } }),
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${unrelatedToken}` } }),
+      fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, { headers: { Authorization: `Bearer ${unrelatedToken}` } }),
+      fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, { headers: { Authorization: `Bearer ${deletePeerToken}` } })
+    ]);
+    const hiddenPeerInbox = await hiddenPeerInboxResponse.json();
+    const unchangedOtherInbox = await unchangedOtherInboxResponse.json();
+    const preservedHiddenHistory = await preservedHiddenHistoryResponse.json();
+    assert(hideConversationResponse.status === 201 && unauthorizedHide.status === 403 && hideForMeResponse.status === 204 &&
+      !hiddenPeerInbox.conversations.some(item => item.id === hideConversationId) &&
+      unchangedOtherInbox.conversations.some(item => item.id === hideConversationId) &&
+      preservedHiddenHistory.messages.length === 1 && hiddenPeerHistoryResponse.status === 404,
+      'TEST 75A: Deleting a conversation hides it only for the authenticated participant and preserves the other inbox and message history');
+
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const newMessageAfterHide = await fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${unrelatedToken}` },
+      body: JSON.stringify({ text: 'A new message brings the conversation back.' })
+    });
+    const [peerInboxAfterNewMessage, historyAfterNewMessage, otherHistoryAfterNewMessage] = await Promise.all([
+      fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${deletePeerToken}` } }),
+      fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, { headers: { Authorization: `Bearer ${deletePeerToken}` } }),
+      fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, { headers: { Authorization: `Bearer ${unrelatedToken}` } })
+    ]);
+    const peerInboxAfterNewMessageData = await peerInboxAfterNewMessage.json();
+    const historyAfterNewMessageData = await historyAfterNewMessage.json();
+    const otherHistoryAfterNewMessageData = await otherHistoryAfterNewMessage.json();
+    const hideAgain = await fetch(`${baseUrl}/conversations/${hideConversationId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${deletePeerToken}` }
+    });
+    const hiddenAgainInbox = await fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${deletePeerToken}` } });
+    const hiddenAgainData = await hiddenAgainInbox.json();
+    const reopenConversation = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deletePeerToken}` },
+      body: JSON.stringify({ recipientId: unrelatedAccount.data.user.id })
+    });
+    const reopenedInbox = await fetch(`${baseUrl}/conversations`, { headers: { Authorization: `Bearer ${deletePeerToken}` } });
+    const reopenedInboxData = await reopenedInbox.json();
+    const reopenedHistory = await fetch(`${baseUrl}/conversations/${hideConversationId}/messages`, {
+      headers: { Authorization: `Bearer ${deletePeerToken}` }
+    });
+    const reopenedHistoryData = await reopenedHistory.json();
+    assert(newMessageAfterHide.status === 201 && peerInboxAfterNewMessageData.conversations.some(item => item.id === hideConversationId) &&
+      historyAfterNewMessageData.messages.length === 1 &&
+      historyAfterNewMessageData.messages[0].text === 'A new message brings the conversation back.' &&
+      peerInboxAfterNewMessageData.conversations.find(item => item.id === hideConversationId).lastMessage.text === 'A new message brings the conversation back.' &&
+      otherHistoryAfterNewMessageData.messages.length === 2 &&
+      hideAgain.status === 204 && !hiddenAgainData.conversations.some(item => item.id === hideConversationId) &&
+      reopenConversation.status === 200 && reopenedInboxData.conversations.some(item => item.id === hideConversationId) &&
+      reopenedHistory.status === 200 && reopenedHistoryData.messages.length === 0,
+      'TEST 75B: Reopening restores the inbox but shows only messages after the latest delete for that user; the other participant keeps full history');
+
     const missingFinalConfirmation = await fetch(`${baseUrl}/account`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deleteOwnerToken}` },
       body: JSON.stringify({ currentPassword: deletePassword, confirmText: 'delete' })

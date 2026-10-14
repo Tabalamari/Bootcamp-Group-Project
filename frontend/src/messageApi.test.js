@@ -14,6 +14,10 @@ let mockConversations = [{
 }];
 let mockMessages = [];
 globalThis.fetch = async (url, options = {}) => {
+  if (url.endsWith('/new-chat') && options.method === 'DELETE') {
+    mockConversations = mockConversations.filter(item => item.id !== 'new-chat');
+    return new Response(null, { status: 204 });
+  }
   if (url.endsWith('/conversations')) {
     if (options.method === 'POST') {
       const conversation = {
@@ -75,4 +79,12 @@ test('an unsent conversation stays available to its sender but hidden from the i
   assert.equal(inbox[0].id, conversationId);
   assert.equal(inbox[0].lastMessage.text, 'Hello!');
   assert.equal(messageApi.pending('new-user', conversationId), null);
+});
+
+test('deleting a conversation for me removes only the local inbox copy after the API confirms', async () => {
+  assert.equal((await messageApi.list('new-user')).length, 1);
+  messageApi.saveDraft('new-user', 'new-person', 'A draft');
+  await messageApi.hide('new-user', 'new-chat');
+  assert.deepEqual(await messageApi.list('new-user'), []);
+  assert.equal(messageApi.draft('new-user', 'new-person'), '');
 });

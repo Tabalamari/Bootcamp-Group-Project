@@ -903,6 +903,10 @@ async function getPublicUserSummary(userId) {
   };
 }
 
+const hideCutoffAfterMessageSql = db.clientType === 'postgres'
+  ? 'conversation_hides.hidden_at >= messages.created_at'
+  : 'julianday(conversation_hides.hidden_at) >= julianday(messages.created_at)';
+
 async function getUnreadCount(conversationId, userId) {
   const readRecord = await db.prepare(`
     SELECT last_read_at FROM conversation_reads 
@@ -919,14 +923,20 @@ async function getUnreadCount(conversationId, userId) {
   return countRow ? Number(countRow.count) : 0;
 }
 
-async function getLastMessage(conversationId) {
+async function getLastMessage(conversationId, userId) {
   const msg = await db.prepare(`
     SELECT id, conversation_id, sender_id, text, created_at 
     FROM messages 
-    WHERE conversation_id = ? 
+    WHERE conversation_id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM conversation_hides
+        WHERE conversation_hides.conversation_id = messages.conversation_id
+          AND conversation_hides.user_id = ?
+          AND ${hideCutoffAfterMessageSql}
+      )
     ORDER BY created_at DESC, id DESC 
     LIMIT 1
-  `).get(conversationId);
+  `).get(conversationId, userId);
 
   if (!msg) return null;
   return {
@@ -941,7 +951,7 @@ async function getLastMessage(conversationId) {
 async function formatConversation(conv, currentUserId) {
   const otherUserId = conv.participant1_id === currentUserId ? conv.participant2_id : conv.participant1_id;
   const otherUser = await getPublicUserSummary(otherUserId);
-  const lastMessage = await getLastMessage(conv.id);
+  const lastMessage = await getLastMessage(conv.id, currentUserId);
   const unreadCount = await getUnreadCount(conv.id, currentUserId);
 
   return {
@@ -958,6 +968,17 @@ async function formatConversation(conv, currentUserId) {
   };
 }
 
+async function isConversationHiddenForUser(conversation, userId) {
+  const hidden = await db.prepare(`
+    SELECT hidden_at, reopened_at FROM conversation_hides
+    WHERE conversation_id = ? AND user_id = ?
+  `).get(conversation.id, userId);
+  if (!hidden || hidden.reopened_at) return false;
+  const hiddenAt = new Date(hidden.hidden_at).getTime();
+  const updatedAt = new Date(conversation.updated_at).getTime();
+  return Number.isFinite(hiddenAt) && Number.isFinite(updatedAt) && hiddenAt >= updatedAt;
+}
+
 // -------------------------------------------------------------
 // 13. Get Conversations List / Inbox (GET /api/conversations)
 // -------------------------------------------------------------
@@ -969,8 +990,15 @@ app.get('/api/conversations', authMiddleware, async (req, res) => {
       FROM conversations
       WHERE (participant1_id = ? OR participant2_id = ?)
         AND EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = conversations.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM conversation_hides
+          WHERE conversation_hides.conversation_id = conversations.id
+            AND conversation_hides.user_id = ?
+            AND conversation_hides.reopened_at IS NULL
+            AND conversation_hides.hidden_at >= conversations.updated_at
+        )
       ORDER BY updated_at DESC
-    `).all(currentUserId, currentUserId);
+    `).all(currentUserId, currentUserId, currentUserId);
 
     const conversations = await Promise.all(rows.map(conv => formatConversation(conv, currentUserId)));
 
@@ -1035,6 +1063,13 @@ app.post('/api/conversations', authMiddleware, async (req, res) => {
         isNew = true;
       }
 
+      // Opening a person's profile and choosing Message again restores this
+      // user's inbox entry while retaining their message-history cutoff.
+      await db.prepare(`
+        UPDATE conversation_hides SET reopened_at = ?
+        WHERE conversation_id = ? AND user_id = ?
+      `).run(now, conversation.id, currentUserId);
+
       if (initialText !== undefined) {
         const msgId = crypto.randomUUID();
         const msgTime = new Date().toISOString();
@@ -1064,6 +1099,37 @@ app.post('/api/conversations', authMiddleware, async (req, res) => {
 // -------------------------------------------------------------
 // 15. Get Single Conversation Detail (GET /api/conversations/:id)
 // -------------------------------------------------------------
+app.delete('/api/conversations/:id', authMiddleware, async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const hideTx = db.transaction(async () => {
+      const lockClause = db.clientType === 'postgres' ? ' FOR UPDATE' : '';
+      const conversation = await db.prepare(`SELECT * FROM conversations WHERE id = ?${lockClause}`).get(req.params.id);
+      if (!conversation) return { status: 404, error: 'Conversation not found' };
+      if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
+        return { status: 403, error: 'Access denied: you are not a participant in this conversation' };
+      }
+      const now = new Date().toISOString();
+      await db.prepare(`
+        INSERT INTO conversation_hides (conversation_id, user_id, hidden_at, reopened_at)
+        VALUES (?, ?, ?, NULL)
+        ON CONFLICT(conversation_id, user_id) DO UPDATE SET hidden_at = ?, reopened_at = NULL
+      `).run(conversation.id, currentUserId, now, now);
+      await db.prepare(`
+        INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(conversation_id, user_id) DO UPDATE SET last_read_at = ?
+      `).run(conversation.id, currentUserId, now, now);
+      return { status: 204 };
+    });
+    const result = await hideTx();
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    return res.status(result.status).end();
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete conversation for this account' });
+  }
+});
+
 app.get('/api/conversations/:id', authMiddleware, async (req, res) => {
   try {
     const currentUserId = req.user.id;
@@ -1075,6 +1141,9 @@ app.get('/api/conversations/:id', authMiddleware, async (req, res) => {
 
     if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
       return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+    if (await isConversationHiddenForUser(conversation, currentUserId)) {
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     const formatted = await formatConversation(conversation, currentUserId);
@@ -1100,6 +1169,9 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
     if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
       return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
     }
+    if (await isConversationHiddenForUser(conversation, currentUserId)) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
 
@@ -1107,9 +1179,15 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
       SELECT id, conversation_id, sender_id, text, created_at
       FROM messages
       WHERE conversation_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM conversation_hides
+          WHERE conversation_hides.conversation_id = messages.conversation_id
+            AND conversation_hides.user_id = ?
+            AND ${hideCutoffAfterMessageSql}
+        )
       ORDER BY created_at ASC, id ASC
       LIMIT ?
-    `).all(conversation.id, limit);
+    `).all(conversation.id, currentUserId, limit);
 
     const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
     const otherUser = await getPublicUserSummary(otherUserId);
@@ -1155,6 +1233,9 @@ app.post('/api/conversations/:id/messages', authMiddleware, async (req, res) => 
       if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
         return { status: 403, error: 'Access denied: you are not a participant in this conversation' };
       }
+      if (await isConversationHiddenForUser(conversation, currentUserId)) {
+        return { status: 404, error: 'Conversation not found' };
+      }
 
       const otherUserId = conversation.participant1_id === currentUserId ? conversation.participant2_id : conversation.participant1_id;
       if (!otherUserId) return { status: 410, error: 'This conversation is read-only because the other account was deleted' };
@@ -1199,6 +1280,9 @@ app.post('/api/conversations/:id/read', authMiddleware, async (req, res) => {
     // Server-enforced participant authorization check
     if (conversation.participant1_id !== currentUserId && conversation.participant2_id !== currentUserId) {
       return res.status(403).json({ error: 'Access denied: you are not a participant in this conversation' });
+    }
+    if (await isConversationHiddenForUser(conversation, currentUserId)) {
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     const now = new Date().toISOString();

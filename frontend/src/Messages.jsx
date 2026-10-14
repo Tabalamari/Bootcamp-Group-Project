@@ -16,6 +16,7 @@ export default function Messages({ user, selected, onSelect }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(null);
   const [failNext, setFailNext] = useState(false);
   const end = useRef(null);
 
@@ -88,15 +89,26 @@ export default function Messages({ user, selected, onSelect }) {
     }
   }
 
+  async function deleteForMe(chatKey, displayName) {
+    if (deleting || !window.confirm(`Delete your conversation with ${displayName}? They will still see their chat and messages.`)) return;
+    setDeleting(chatKey); setError('');
+    try {
+      await service.hide(user.id, chatKey);
+      if (selected === chatKey) onSelect(null);
+      await load(false);
+    } catch (e) { setError(e.message); }
+    finally { setDeleting(null); }
+  }
+
   return <section><span className="eyebrow">KEEP THE CONVERSATION GOING</span><h1>Messages</h1><p className="intro">Your people, one conversation at a time.</p>
     {isDemo ? <p className="message-demo">Sample messaging · Conversations and drafts reset on reload. No messages are sent to real people.</p> : <p className="field-help">Your conversations are saved to your account. Refresh to check for new messages.</p>}
     {loading ? <p role="status">Loading conversations…</p> : <div className={`inbox-layout ${current ? 'chat-open' : ''}`}>
       <aside className="conversation-list form-card" aria-label="Conversations"><div className="flex items-center justify-between gap-3"><h2>Your conversations</h2><button className="text-button" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button></div>
         {!chats.length && <p className="intro">No conversations yet. <a href="#discover">Find someone in Discover</a> and open their profile to say hello.</p>}
-        {chats.map(c => { const chatKey = c.id || c.person.id; return <button className="conversation-item" key={chatKey} aria-pressed={isConversationSelected(c, selected)} disabled={sending} onClick={() => onSelect(chatKey)}><Avatar photo={c.person.photo} name={c.person.displayName}/><span><strong>{c.person.displayName}</strong><span className="conversation-preview">{c.lastMessage?.text || c.messages.at(-1)?.text || 'Start your conversation'}</span></span>{c.unread > 0 && <span className="unread-badge" aria-label={`${c.unread} unread messages`}>{c.unread}</span>}</button>; })}
+        {chats.map(c => { const chatKey = c.id || c.person.id; return <div className="message-conversation-row" key={chatKey}><button className="conversation-item" aria-pressed={isConversationSelected(c, selected)} disabled={sending || deleting === chatKey} onClick={() => onSelect(chatKey)}><Avatar photo={c.person.photo} name={c.person.displayName}/><span><strong>{c.person.displayName}</strong><span className="conversation-preview">{c.lastMessage?.text || c.messages.at(-1)?.text || 'Start your conversation'}</span></span>{c.unread > 0 && <span className="unread-badge" aria-label={`${c.unread} unread messages`}>{c.unread}</span>}</button><button type="button" className="conversation-delete" aria-label={`Delete conversation with ${c.person.displayName} for me`} title="Delete for me" disabled={Boolean(deleting)} onClick={() => deleteForMe(chatKey, c.person.displayName)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5"/></svg></button></div>; })}
       </aside>
       <div className="chat-panel form-card">
-        {current ? <><header className="chat-heading"><button className="text-button mobile-chat-back" disabled={sending} onClick={() => onSelect(null)}>← All conversations</button><div className="flex items-center gap-3"><Avatar photo={current.person.photo} name={current.person.displayName}/><h2>{current.person.displayName}</h2></div></header>
+        {current ? <><header className="chat-heading flex items-center justify-between gap-3"><div className="flex items-center gap-3"><button className="text-button mobile-chat-back" disabled={sending} onClick={() => onSelect(null)}>← All conversations</button><Avatar photo={current.person.photo} name={current.person.displayName}/><h2>{current.person.displayName}</h2></div><button type="button" className="conversation-delete" aria-label={`Delete conversation with ${current.person.displayName} for me`} title="Delete for me" disabled={Boolean(deleting)} onClick={() => deleteForMe(selected, current.person.displayName)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5"/></svg></button></header>
           <div className="message-history" role="log" aria-label={`Messages with ${current.person.displayName}`} aria-live="polite">{historyLoading ? <p role="status" className="intro">Loading message history…</p> : historyError ? <div role="alert" className="error-banner">{historyError}<button className="text-button" onClick={() => { setHistoryError(''); setHistoryLoading(true); messageApi.history(user.id, selected).catch(e => setHistoryError(e.message)).finally(() => setHistoryLoading(false)); }}>Try again</button></div> : !current.messages.length ? <p className="intro">{current.person.status === 'deleted' ? 'No earlier messages are available in this conversation.' : 'Say hello and introduce yourself.'}</p> : current.messages.map(m => <div className={`message-bubble ${m.sender === 'you' ? 'outgoing' : 'incoming'}`} key={m.id}><span className="message-author">{m.sender === 'you' ? 'You' : current.person.displayName}</span><p>{m.text}</p><time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>)}<div ref={end}/></div>
           {current.person.status === 'deleted' ? <p className="deleted-chat-notice" role="status">This conversation is read-only because this account was deleted. Earlier messages are kept for your records.</p> : <form onSubmit={send} className="message-composer"><label htmlFor="message-draft">Your message</label><textarea id="message-draft" maxLength={2000} value={draft} disabled={sending} onChange={e => { setDraft(e.target.value); service.saveDraft(user.id, selected, e.target.value); }} placeholder="Write a friendly hello…"/><div className="composer-actions"><span className="field-help">{draft.length}/2,000 · Enter adds a new line</span><button className="primary" disabled={sending || !draft.trim()}>{sending ? 'Sending…' : 'Send message'}</button></div></form>}
         </> : <div className="chat-placeholder"><h2>A space to connect</h2><p>Choose a conversation or find someone new in Discover.</p><a href="#discover">Discover people →</a></div>}

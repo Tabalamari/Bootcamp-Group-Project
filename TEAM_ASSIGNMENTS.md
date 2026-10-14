@@ -1,7 +1,7 @@
 # Bootcamp Connect - Team Assignments and Feature Tracker
 
 Date: 1 October 2026  
-Last updated: 13 October 2026
+Last updated: 14 October 2026
 
 Related specification: [PRD.md](PRD.md), FR-01 through FR-06
 
@@ -388,3 +388,11 @@ The feature is complete when all three contributions work together and the share
 - PostgreSQL migration: `backend/migrations/account-deletion-postgres.sql` changes conversation and message references to nullable `SET NULL` behavior. The migration was applied to the configured Supabase database and verified using transaction-only synthetic records that were rolled back. Existing message text is retained and may still contain personal details, as described in the README.
 - Checks: backend suite (83 API assertions and 10 unit tests), frontend suite (28 tests), and production build passed. Two-account local verification confirmed the other participant retains the conversation after deletion.
 - Application commit `191964f` was pushed to `feature/delete-account`, merged and pushed to `main`, and deployed successfully to the Render staging service from `feature/prepare-supabase-production`.
+
+## Delete conversation for me - 14 October 2026
+
+- Added an authenticated per-user “Delete for me” action to the conversation list and open chat. It hides the selected conversation only for that user and removes their unsent draft; shared conversation rows and messages remain unchanged for the other participant.
+- When a hidden conversation returns after a new message or the user opens it from Discover, the deleting user sees only messages sent after their deletion cutoff. The other participant continues to see the full shared history.
+- A new message from the other participant makes the conversation visible again. Opening the person’s profile and choosing Message also restores the conversation for the current user.
+- Added `backend/migrations/conversation-hide-for-self.sql` for existing Supabase databases. The additive migration is applied to the configured Supabase database; it adds the history-cutoff/reopen metadata without deleting messages. SQLite creates the table and adds the column automatically for existing local databases.
+- Checks: backend suite passed (86 API assertions and 10 unit tests); frontend suite passed (34 tests); production build passed. API checks verify participant authorization, one-sided hiding, hidden-user access denial, preserved history, new-message restoration, and explicit reopening.

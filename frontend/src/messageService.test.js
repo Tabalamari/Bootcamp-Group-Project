@@ -42,3 +42,15 @@ test('incoming messages update subscribers and unread clears only for the opened
   assert.ok(updates > 0); unsubscribe();
   const previous = updates; service.simulateIncoming('one'); assert.equal(updates, previous);
 });
+
+test('hiding a conversation affects only that account and an incoming message restores it', async () => {
+  const service = createMessageService();
+  service.open('one', 'sample-amara');
+  await service.send('one', 'sample-amara', 'Hello');
+  service.hide('one', 'sample-amara');
+  assert.deepEqual(service.list('one'), []);
+  assert.equal(service.list('two').length, 0);
+  service.simulateIncoming('one', 'sample-amara');
+  assert.equal(service.list('one').length, 1);
+  assert.equal(service.list('one')[0].messages.length, 2);
+});

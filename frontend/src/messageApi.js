@@ -106,6 +106,14 @@ export const messageApi = {
     conversation.unread = 0;
     notify();
   },
+  async hide(userId, conversationId) {
+    const conversation = getConversation(userId, conversationId);
+    await request(`/conversations/${encodeURIComponent(conversation.id)}`, { method: 'DELETE' });
+    conversations = conversations.filter(item => item.id !== conversation.id);
+    pendingConversations.delete(conversation.id);
+    drafts.delete(draftKey(userId, conversation.person.id));
+    notify();
+  },
   draft(userId, conversationId) { return drafts.get(draftKey(userId, conversationId)) || ''; },
   saveDraft(userId, conversationId, text) { drafts.set(draftKey(userId, conversationId), text); },
   async send(userId, conversationId, text) {

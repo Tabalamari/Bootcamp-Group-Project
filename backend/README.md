@@ -4,7 +4,7 @@ Backend implementation for Bootcamp Connect core features:
 - **FR-01:** Registration, authentication, course selection, protected access, and logout.
 - **FR-02:** User profiles, options vocabulary, profile viewing/editing, photo uploads/removal, and community profiles.
 - **FR-03:** Search, filters (course, skills, interests, goals with AND/OR logic), factual explainable fit reasons, and pagination.
-- **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking).
+- **FR-04:** Private messaging (1-on-1 text conversations, deduplication, 2-participant server isolation, message persistence, inbox preview, unread tracking, suspension blocking, and per-user conversation hiding).
 - **FR-05:** Administration (admin workspace data, taxonomy & category management, soft deactivation, duplicate prevention, learner course correction, session revocation upon suspension, strict privacy isolation for student chats).
 - **FR-06:** Account settings (authenticated name and course updates, password changes with reauthentication, session revocation policy, rate-limited attempts).
 - **Account deletion:** Password-confirmed permanent deletion of credentials, profile, sessions, and owned photo; existing chats are retained and anonymized for the remaining participant.
@@ -38,6 +38,8 @@ For a new Supabase project, apply `supabase-schema.sql` and then `supabase-seed.
 
 For an existing Supabase database, apply `migrations/account-deletion-postgres.sql` before deploying account deletion. The migration makes conversation participants and message senders nullable with `ON DELETE SET NULL`; it preserves current rows and ensures the remaining participant can still read the thread. For local SQLite databases, the backend copies the existing conversations, messages, and read markers into the updated schema on startup, then checks foreign-key integrity. Back up the database before upgrading as a normal precaution.
 
+For “Delete for me” on an existing Supabase database, apply `migrations/conversation-hide-for-self.sql` before deploying the updated app. This additive migration creates per-user hide markers and a reopen timestamp; it does not delete conversations or messages. The hide timestamp is also a per-user history cutoff: after the conversation reappears because of a new message or the user opens it again from Discover, that user sees only messages sent after deletion. The other participant continues to see the full history. SQLite adds the column automatically to existing local databases during startup.
+
 Message text remains available to the other participant after account removal and may contain information the sender wrote in the text. The app removes the sender's account identity, name and photo from the conversation metadata; it does not attempt to rewrite historical message bodies.
 
 For an existing SQLite project, keep a backup of both `database.sqlite` and `uploads/`, set `DB_CLIENT=postgres` and `DATABASE_URL`, then run:
@@ -55,7 +57,7 @@ Backend API tests use an in-memory SQLite database even when `backend/.env` cont
 ```bash
 npm test
 ```
-The API suite runs 83 automated checks verifying the following. The command also runs unit checks for the PostgreSQL deletion-schema guard, SQLite account-deletion migration behavior, Supabase Storage URL, upload, deletion, error behavior, and PostgreSQL SSL configuration:
+The API suite runs 86 automated checks verifying the following. The command also runs unit checks for the PostgreSQL deletion-schema guard, SQLite account-deletion migration behavior, Supabase Storage URL, upload, deletion, error behavior, and PostgreSQL SSL configuration:
 - All FR-01 authentication, session, course, and error-handling requirements.
 - All 7 FR-02 acceptance criteria (profile display, options vocabulary, persistent updates across sessions, ownership protection, photo fallback, photo format/size validation, and private field exclusion).
 - All 9 FR-03 acceptance criteria (discovery query search, course filter, multi-select skill/interest/goal filters with OR/AND logic, filter clear, self & suspended exclusion, factual explainable fit reasons, empty state, and pagination).
