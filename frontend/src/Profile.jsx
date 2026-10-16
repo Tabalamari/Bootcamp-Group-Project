@@ -1,12 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { profileOptions, profileService, validatePhoto, validateProfile } from './profileService';
 import { profileApi } from './profileApi';
 import { isDemo } from './authService';
 
 const assetOrigin = import.meta.env.VITE_ASSET_ORIGIN || window.location.origin;
+const PhotoViewerContext = createContext(null);
+
+export function PhotoViewerProvider({ children }) {
+  const [photo, setPhoto] = useState(null);
+  const dialog = useRef(null);
+  useEffect(() => { if (photo && dialog.current && !dialog.current.open) dialog.current.showModal(); }, [photo]);
+  function close() { dialog.current?.close(); setPhoto(null); }
+  return <PhotoViewerContext.Provider value={setPhoto}>
+    {children}
+    <dialog ref={dialog} className="photo-dialog" aria-label="Enlarged profile photo" onClose={() => setPhoto(null)} onClick={event => { if (event.target === dialog.current) { const r = dialog.current.getBoundingClientRect(); if(event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
+      <button type="button" className="secondary" onClick={close}>Close photo</button>
+      {photo && <img src={photo.url} alt={`${photo.name}'s profile photo enlarged`} />}
+    </dialog>
+  </PhotoViewerContext.Provider>;
+}
 
 export function Avatar({ photo, name, large = false }) {
-  return <span className={`profile-avatar ${large ? 'large' : ''}`}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>}</span>;
+  const openPhoto = useContext(PhotoViewerContext);
+  const avatarClass = `profile-avatar ${large ? 'large' : ''}`;
+  return photo && openPhoto
+    ? <button type="button" className={`${avatarClass} photo-trigger`} aria-label={`Enlarge ${name}'s profile photo`} onClick={() => openPhoto({ url: photo, name })}><img src={photo} alt="" /></button>
+    : <span className={avatarClass}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>}</span>;
 }
 function BinIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>; }
 
@@ -21,7 +40,7 @@ export default function Profile({ user, courses, onSaved }) {
   const [notice, setNotice] = useState('');
   const [photoError, setPhotoError] = useState('');
   const [availableOptions, setAvailableOptions] = useState(profileOptions);
-  const dialog = useRef(null), fileInput = useRef(null), form = useRef(null), photoVersion = useRef(0);
+  const fileInput = useRef(null), form = useRef(null), photoVersion = useRef(0);
   useEffect(() => { let alive = true; Promise.all([isDemo ? profileService.get(user) : profileApi.get(), isDemo ? Promise.resolve(profileOptions) : profileApi.options()]).then(([value, options]) => { if (alive) { setSaved(value); setDraft(value); setAvailableOptions(options); } }).catch(error => { if (alive) setFailure(error.message); }); return () => { alive = false; photoVersion.current++; }; }, [user.id]);
   const profile = editing ? draft : saved;
   async function save(event) {
@@ -78,7 +97,7 @@ export default function Profile({ user, courses, onSaved }) {
     {notice && <p className="success-banner" role="status">{notice}</p>}
     {failure && <p className="error-banner" role="alert">{failure}</p>}
     <div className="profile-layout"><aside className="form-card profile-summary">
-      {profile.photo ? <button type="button" className="photo-open" aria-label="Enlarge profile photo" onClick={() => dialog.current.showModal()}><Avatar photo={profile.photo} name={profile.displayName} large /></button> : <Avatar name={profile.displayName} large />}
+      <Avatar photo={profile.photo} name={profile.displayName} large />
       <h2>{profile.displayName || 'Your name'}</h2><p>{courses.find(c => c.id === profile.courseId)?.name || profile.courseId}</p>
       {profile.photo && <p className="field-help">Select your photo to enlarge it.</p>}
       <p className="profile-hint">Your email and password are not shown on your community profile.</p>
@@ -97,6 +116,5 @@ export default function Profile({ user, courses, onSaved }) {
       </fieldset>
     </form> : <div className="form-card profile-details"><h2>About me</h2><p className="bio-text">{profile.bio || 'Tell your community a little about yourself. Select Edit profile to get started.'}</p>{[['skills','Skills I bring'],['interests','My interests'],['goals','Looking for']].map(([key,title]) => <section key={key}><h2>{title}</h2><div className="profile-tags">{profile[key].length ? profile[key].map(value => <span key={value}>{value}</span>) : <p className="text-[#526782]">Nothing added yet.</p>}</div></section>)}</div>}
     </div>
-    <dialog ref={dialog} className="photo-dialog" aria-label="Enlarged profile photo" onClick={event => { if (event.target === dialog.current) { const r = dialog.current.getBoundingClientRect(); if(event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.current.close(); } }}><button type="button" className="secondary" onClick={() => dialog.current.close()}>Close photo</button>{profile.photo && <img src={profile.photo} alt={`${profile.displayName}'s profile photo enlarged`} />}</dialog>
   </section>;
 }

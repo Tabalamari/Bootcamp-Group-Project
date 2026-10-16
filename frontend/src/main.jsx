@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { auth, isDemo } from './authService';
 import { validateAuth } from './validation';
 import './styles.css';
-import Profile, { Avatar } from './Profile';
+import Profile, { Avatar, PhotoViewerProvider } from './Profile';
 import Discovery from './Discovery';
 import Messages from './Messages';
 import Admin from './Admin';
@@ -105,10 +105,10 @@ function App() {
   const fieldProps = name => ({ name, id: name, value: values[name], onChange: change, 'aria-invalid': !!errors[name], 'aria-describedby': errors[name] ? `${name}-error` : name === 'password' && registering ? 'password-help' : undefined });
   const errorFor = name => errors[name] && <p className="field-error" id={`${name}-error`}>{errors[name]}</p>;
 
-  return <div className="min-h-screen bg-[#f3f7fd] text-[#183252]">
+  return <PhotoViewerProvider><div className="min-h-screen bg-[#f3f7fd] text-[#183252]">
     <header className="site-header flex flex-wrap items-center justify-between gap-4">
       <a className="brand flex items-center gap-3" href={user ? '#welcome' : '#register'} aria-label="SkillBridge home"><img className="brand-mark" src="/favicon.svg" alt="" width="40" height="40"/><span>SkillBridge</span></a>
-      {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span><Avatar photo={profilePhoto} name={user.displayName} /></a><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
+      {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span></a><Avatar photo={profilePhoto} name={user.displayName} /><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
     <div className={user ? "signed-in-layout" : "signed-out-layout"}>
@@ -135,7 +135,7 @@ function App() {
           </section>
         </div>}
     </main></div><footer className="site-footer">SkillBridge <span>Learn together. Build together.</span></footer>
-  </div>;
+  </div></PhotoViewerProvider>;
 }
 
 createRoot(document.getElementById('root')).render(<App />);
