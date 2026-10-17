@@ -93,7 +93,6 @@ export default function Profile({ user, courses, onSaved }) {
   }
   if (!profile) return <section className="form-card"><h1>Your profile</h1><p role={failure ? 'alert' : 'status'}>{failure || 'Loading your profile…'}</p>{failure && <button className="secondary" onClick={() => { setFailure(''); (isDemo ? profileService.get(user) : profileApi.get()).then(p => { setSaved(p); setDraft(p); }).catch(e => setFailure(e.message)); }}>Try again</button>}</section>;
   return <section className="profile-page">
-    <a href="#welcome" className="back-link">← Back to welcome</a>
     <div className="profile-title"><div><span className="eyebrow">LET PEOPLE GET TO KNOW YOU</span><h1>{editing ? 'Edit your profile' : 'Your profile'}</h1><p className="intro">Show what you bring and what you want to build together.</p></div>{!editing && <button className="primary" onClick={() => { setDraft(saved); setNotice(''); setEditing(true); }}>Edit profile</button>}</div>
     {notice && <p className="success-banner" role="status">{notice}</p>}
     {failure && <p className="error-banner" role="alert">{failure}</p>}
