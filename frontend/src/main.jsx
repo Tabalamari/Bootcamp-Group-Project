@@ -139,8 +139,17 @@ function App() {
           {failure && <p className="error-banner" role="alert">{failure}</p>}
         </section>) :
         <div className="auth-layout">
-          <aside className="story"><span className="eyebrow">YOUR BOOTCAMP. YOUR PEOPLE.</span><h2>Good things start<br className="hidden lg:block" /> with a hello.</h2><p>Meet the people learning alongside you. Find complementary skills, share ideas, and build something together.</p><img src="/community-hero.webp" alt="Bootcamp learners collaborating around a laptop" width="1448" height="1086" /><div className="story-note"><span className="note-dot" /> Software minds. Business ideas. Shared ambition.</div></aside>
-          <section className="form-card"><div className="eyebrow">{registering ? 'JOIN THE COMMUNITY' : 'WELCOME BACK'}</div><h1>{registering ? 'Let’s get you connected.' : 'Your community awaits.'}</h1><p className="intro">{registering ? 'Create your account and find your people.' : 'Sign in to pick up where you left off.'}</p>
+          <aside className="story auth-story-hero">
+            <span className="discovery-hero-kicker"><span aria-hidden="true">✦</span> YOUR BOOTCAMP. YOUR PEOPLE.</span>
+            <h2>Good things start<br className="hidden lg:block" /> with a hello.</h2>
+            <p>Meet the people learning alongside you. Find complementary skills, share ideas, and build something together.</p>
+            <div className="discovery-hero-photo auth-story-photo">
+              <img src="/discover-collaboration-hero.jpg" alt="Three bootcamp learners collaborating around a laptop in a bright coworking space" width="1448" height="1086" />
+              <span className="discovery-photo-label"><span aria-hidden="true">●</span> Business + software</span>
+            </div>
+            <div className="story-note"><span className="note-dot" /> Software minds. Business ideas. Shared ambition.</div>
+          </aside>
+          <section className={`form-card${registering ? ' register-card' : ''}`}><div className="eyebrow">{registering ? 'JOIN THE COMMUNITY' : 'WELCOME BACK'}</div><h1>{registering ? 'Let’s get you connected.' : 'Your community awaits.'}</h1><p className="intro">{registering ? 'Create your account and find your people.' : 'Sign in to pick up where you left off.'}</p>
             {message && <p className="success-banner" role="status">{message}</p>}
             <form ref={formRef} onSubmit={submit} noValidate aria-busy={busy}>
               <fieldset disabled={busy}>

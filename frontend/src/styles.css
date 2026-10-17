@@ -34,6 +34,19 @@
 @media(max-width:1000px){.welcome-hero{grid-template-columns:minmax(0,1fr) minmax(240px,.8fr);gap:12px;padding:30px 28px}.learner-chip{width:196px}.welcome-copy h1{font-size:38px}}
 @media(max-width:760px){.welcome-hero{grid-template-columns:1fr;gap:4px;padding:26px 22px 14px}.welcome-copy h1{font-size:34px}.welcome-visual{min-height:190px;margin-top:18px}.welcome-orbit{width:155px;height:155px}.welcome-orbit:before{inset:16px}.welcome-orbit:after{inset:34px}.learner-chip{width:min(205px,58vw);padding:10px}.learner-chip-business{top:4px;left:0}.learner-chip-software{right:0;bottom:6px}.welcome-steps{grid-template-columns:1fr;gap:9px}.welcome-step{min-height:75px;padding:13px 14px}.welcome-section-heading{margin-top:25px}.welcome-section-heading p{font-size:12px}}
 @media(max-width:400px){.welcome-hero{padding:23px 16px 12px}.welcome-copy h1{font-size:30px}.welcome-copy>p{font-size:14px}.welcome-actions{gap:8px}.welcome-actions .primary,.welcome-actions .secondary{padding:10px 12px;font-size:13px}.learner-chip{width:61vw}.learner-chip strong{font-size:11px}.learner-chip small{font-size:9px}}
+
+/* Keep the shared login and registration story visually aligned with Discovery. */
+.story.auth-story-hero{box-sizing:border-box;align-self:stretch;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.auth-story-hero .discovery-hero-kicker{margin-bottom:18px}
+.auth-story-hero h2{margin:0 0 14px;color:#172b4d;font-size:clamp(34px,3.7vw,44px);line-height:1.08;letter-spacing:-1.5px}
+.auth-story-hero>p{max-width:440px;margin:0;color:#5c6f8a;font-size:16px;line-height:1.7}
+.auth-story-hero .auth-story-photo{margin-top:24px}
+.auth-story-hero .auth-story-photo img{margin-top:0}
+.auth-story-hero .story-note{margin-top:18px}
+@media(max-width:1000px){.story.auth-story-hero{padding:0}.auth-story-hero h2{font-size:36px}}
+@media(max-width:760px){.story.auth-story-hero{padding:0;margin-top:24px;border-radius:0}.auth-story-hero .discovery-hero-kicker{margin-bottom:14px;font-size:9px}.auth-story-hero h2{font-size:30px}.auth-story-hero>p{font-size:14px}.auth-story-hero .auth-story-photo{margin-top:20px}.auth-story-hero .story-note{margin-top:16px}}
+@media(min-width:761px) and (max-height:900px){.page-wrap:has(.auth-layout){padding-top:28px;padding-bottom:32px}.story.auth-story-hero{padding:0}.auth-story-hero .discovery-hero-kicker{margin-bottom:12px;padding:6px 10px}.auth-story-hero h2{font-size:34px;margin-bottom:10px}.auth-story-hero>p{font-size:14px;line-height:1.5}.auth-story-hero .auth-story-photo{margin-top:16px}.auth-story-hero .auth-story-photo img{aspect-ratio:16/9}.auth-story-hero .discovery-photo-label{left:16px;bottom:15px;padding:7px 10px}.auth-story-hero .story-note{margin-top:12px;font-size:11px}}
+@media(min-width:761px) and (max-height:900px){.register-card{padding:30px}.register-card h1{font-size:27px;margin-bottom:9px}.register-card .intro{margin-bottom:20px}.register-card .field{margin-bottom:14px}.register-card .field label{margin-bottom:6px}.register-card .field input,.register-card .field select{min-height:44px;padding:10px 12px}.register-card .field-help{margin-top:5px}.register-card .switch-page{margin-top:16px}}
 .person-card{background:#fff;border-color:#d7e2f2}
 .discovery-hero{position:relative;isolation:isolate;border:1px solid #dbe5f7;background:radial-gradient(ellipse at 8% 0%,#fff 0,transparent 40%),linear-gradient(122deg,#e9f0ff 0%,#f7f9ff 52%,#e5edff 100%);box-shadow:0 16px 40px #264b8d0c}
 .discovery-hero-photo{position:relative;min-width:0;padding:8px;border-radius:22px;background:linear-gradient(140deg,#9db8ff,#fff 49%,#a8c3ff);box-shadow:0 18px 32px #233f771c}
