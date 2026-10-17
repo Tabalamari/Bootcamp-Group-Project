@@ -23,9 +23,10 @@ export function PhotoViewerProvider({ children }) {
 export function Avatar({ photo, name, large = false }) {
   const openPhoto = useContext(PhotoViewerContext);
   const avatarClass = `profile-avatar ${large ? 'large' : ''}`;
+  const initial = name?.trim().charAt(0).toUpperCase() || '?';
   return photo && openPhoto
     ? <button type="button" className={`${avatarClass} photo-trigger`} aria-label={`Enlarge ${name}'s profile photo`} onClick={() => openPhoto({ url: photo, name })}><img src={photo} alt="" /></button>
-    : <span className={avatarClass}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg>}</span>;
+    : <span className={`${avatarClass}${photo ? '' : ' profile-avatar-initial'}`} aria-hidden={photo ? undefined : true}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : initial}</span>;
 }
 function BinIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>; }
 
