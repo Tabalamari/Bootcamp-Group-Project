@@ -42,7 +42,7 @@
 .messages-page.chat-active .chat-heading{flex:0 0 auto}
 .messages-page.chat-active .message-history{height:auto;min-height:0;flex:1 1 auto}
 .messages-page.chat-active .message-composer{flex:0 0 auto}
-@media(max-width:760px){.signed-in-layout:has(.messages-page.chat-active)>.community-nav:not([data-open="true"]){display:none}.messages-page.chat-active .chat-panel{height:calc(100dvh - 200px);padding:14px}}
+@media(max-width:760px){.signed-in-layout:has(.messages-page.chat-active)>.community-nav:not([data-open="true"]){display:none}.messages-page.chat-active .chat-panel{height:max(320px,calc(100dvh - 124px));padding:14px}}
 @media(max-height:650px){.messages-page.chat-active h1{font-size:23px;margin-bottom:6px}.messages-page.chat-active .chat-panel{padding:10px}.messages-page.chat-active .chat-heading{padding-bottom:8px}.messages-page.chat-active .message-history{padding:8px 4px}.messages-page.chat-active .message-composer label{margin-bottom:4px}.messages-page.chat-active .message-composer textarea{min-height:44px}.messages-page.chat-active .composer-actions{margin-top:6px}.messages-page.chat-active .composer-actions .primary{min-height:42px;padding:8px 14px}}
 @media(max-width:760px){.signed-in-layout .page-wrap:has(.messages-page){padding-top:12px}.messages-page h1{margin-bottom:18px}}
 .brand-mark{display:block;width:40px;height:40px;border-radius:12px;flex:none}
