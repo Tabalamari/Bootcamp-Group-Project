@@ -30,6 +30,9 @@ playwright-report/
 *.log
 /logs/
 
+# Local presentation assets and exports
+/presentation/
+
 # OS and editor files
 .DS_Store
 Thumbs.db

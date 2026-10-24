@@ -23,7 +23,7 @@ export function PhotoViewerProvider({ children }) {
 export function Avatar({ photo, name, large = false }) {
   const openPhoto = useContext(PhotoViewerContext);
   const avatarClass = `profile-avatar ${large ? 'large' : ''}`;
-  const initial = name?.trim().charAt(0).toUpperCase() || '?';
+  const initial = name?.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || '?';
   return photo && openPhoto
     ? <button type="button" className={`${avatarClass} photo-trigger`} aria-label={`Enlarge ${name}'s profile photo`} onClick={() => openPhoto({ url: photo, name })}><img src={photo} alt="" /></button>
     : <span className={`${avatarClass}${photo ? '' : ' profile-avatar-initial'}`} aria-hidden={photo ? undefined : true}>{photo ? <img src={photo} alt={`${name}'s profile photo`} /> : initial}</span>;
