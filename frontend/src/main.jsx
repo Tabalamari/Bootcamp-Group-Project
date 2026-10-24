@@ -19,6 +19,7 @@ function App() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [unread, setUnread] = useState(0);
   const [messageNotice, setMessageNotice] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const messaging = isDemo ? messageService : messageApi;
   useEffect(() => {
     setSelectedChat(null); setMessageNotice(''); setUnread(0);
@@ -65,6 +66,7 @@ function App() {
   useEffect(() => { start(); loadCourses(); }, []);
   useEffect(() => {
     function navigate() {
+      setMobileMenuOpen(false);
       setPage(location.hash === '#settings' ? 'settings' : location.hash === '#admin' ? 'admin' : location.hash === '#messages' ? 'messages' : location.hash === '#discover' ? 'discover' : location.hash === '#profile' ? 'profile' : location.hash === '#register' ? 'register' : 'login');
       setErrors({}); setFailure(''); setValues(v => ({ ...v, password: '' }));
     }
@@ -97,6 +99,7 @@ function App() {
     finally { setBusy(false); }
   }
   async function logout() {
+    setMobileMenuOpen(false);
     setBusy(true); setFailure('');
     try { await auth.logout(); setUser(null); setPage('login'); location.hash = 'login'; setMessage('You’ve been logged out.'); }
     catch (error) { setFailure(error.message); }
@@ -108,11 +111,11 @@ function App() {
   return <PhotoViewerProvider><div className="min-h-screen bg-[#f3f7fd] text-[#183252]">
     <header className="site-header flex flex-wrap items-center justify-between gap-4">
       <a className="brand flex items-center gap-3" href={user ? '#welcome' : '#register'} aria-label="SkillBridge home"><img className="brand-mark" src="/favicon.svg" alt="" width="40" height="40"/><span>SkillBridge</span></a>
-      {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span></a><Avatar photo={profilePhoto} name={user.displayName} /><button className="secondary" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
+      {user ? <div className="flex items-center gap-3"><a href="#profile" className="account-link" aria-label="Open your profile"><span className="hidden sm:inline">{user.displayName}</span></a><Avatar photo={profilePhoto} name={user.displayName} /><button className="secondary desktop-logout" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button><button type="button" className="mobile-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileMenuOpen} aria-controls="community-navigation" onClick={() => setMobileMenuOpen(open => !open)}><svg viewBox="0 0 24 24" aria-hidden="true">{mobileMenuOpen ? <path d="m6 6 12 12M18 6 6 18"/> : <path d="M4 7h16M4 12h16M4 17h16"/>}</svg></button></div> : <span className="text-sm text-[#526782]">Different skills. Shared possibilities.</span>}
     </header>
     {isDemo && <div className="demo-banner">Frontend demo · Use fictional details. Accounts reset when this page reloads.</div>}
     <div className={user ? "signed-in-layout" : "signed-out-layout"}>
-    {user && <nav className="community-nav" aria-label="Community"><span className="sidebar-label">YOUR COMMUNITY</span><a href="#welcome" aria-current={!["profile","discover","messages","admin","settings"].includes(page) ? "page" : undefined}>Welcome</a><a href="#discover" aria-current={page === "discover" ? "page" : undefined}>Discover</a><a href="#profile" aria-current={page === "profile" ? "page" : undefined}>My profile</a><a href="#messages" aria-current={page === "messages" ? "page" : undefined}>Messages {unread > 0 && <span className="unread-badge" aria-label={`${unread} unread messages`}>{unread}</span>}</a><a href="#settings" aria-current={page === "settings" ? "page" : undefined}>Account settings</a><a href="#admin" aria-current={page === "admin" ? "page" : undefined}>{isDemo ? 'Admin preview' : 'Administration'}</a>{isDemo && <button className="sample-incoming" onClick={() => { const name = messageService.simulateIncoming(user.id); setMessageNotice(`Sample message from ${name}. Open Messages to read it.`); }}>Try sample incoming message</button>}</nav>}
+    {user && <nav id="community-navigation" data-open={mobileMenuOpen} className="community-nav" aria-label="Community"><span className="sidebar-label">YOUR COMMUNITY</span><a href="#welcome" aria-current={!["profile","discover","messages","admin","settings"].includes(page) ? "page" : undefined}>Welcome</a><a href="#discover" aria-current={page === "discover" ? "page" : undefined}>Discover</a><a href="#profile" aria-current={page === "profile" ? "page" : undefined}>My profile</a><a href="#messages" aria-current={page === "messages" ? "page" : undefined}>Messages {unread > 0 && <span className="unread-badge" aria-label={`${unread} unread messages`}>{unread}</span>}</a><a href="#settings" aria-current={page === "settings" ? "page" : undefined}>Account settings</a><a href="#admin" aria-current={page === "admin" ? "page" : undefined}>{isDemo ? 'Admin preview' : 'Administration'}</a>{isDemo && <button className="sample-incoming" onClick={() => { const name = messageService.simulateIncoming(user.id); setMessageNotice(`Sample message from ${name}. Open Messages to read it.`); }}>Try sample incoming message</button>}<button type="button" className="mobile-menu-logout" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button></nav>}
     <main className="page-wrap">{user && messageNotice && <div className="message-notice" role="status">{messageNotice} {isDemo && <a href="#messages" onClick={() => setSelectedChat("sample-amara")}>Open chat</a>}<button aria-label="Dismiss message notification" onClick={() => setMessageNotice("")}>×</button></div>}
       {!ready ? <section className="form-card mx-auto max-w-lg" aria-live="polite"><h1>Getting things ready…</h1>{failure && <><p role="alert" className="error-banner">{failure}</p><button className="primary" onClick={start}>Try again</button></>}</section> : user ?
         (page === 'settings' ? <Settings key={user.id} user={user} courses={courses} onUpdated={account => setUser(current => ({ ...current, ...account }))} onDeleted={() => { setProfilePhoto(''); setUser(null); setPage('login'); location.hash = 'login'; setMessage('Your account has been deleted.'); }} /> : page === 'admin' ? <Admin key={user.id} user={user} /> : page === 'messages' ? <Messages key={user.id} user={user} selected={selectedChat} onSelect={setSelectedChat} /> : page === 'discover' ? <Discovery key={user.id} user={user} onMessage={startChat} /> : page === 'profile' ? <Profile key={user.id} user={user} courses={courses} onSaved={profile => { setProfilePhoto(profile.photo); setUser(u => ({ ...u, displayName: profile.displayName })); }} /> : <section className="welcome-home" aria-labelledby="welcome-heading">

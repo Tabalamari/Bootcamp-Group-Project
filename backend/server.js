@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 const { createSupabasePhotoStorage } = require('./photo-storage');
+const { calculateMatch } = require('./matching');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -666,49 +667,6 @@ function parseListParam(param) {
     .filter(Boolean);
 }
 
-// Calculate evidence-based fit reasons between candidate and viewer
-function calculateFitReasons(candidate, viewer) {
-  const reasons = [];
-
-  // 1. Shared interests
-  const viewerInterests = (viewer.interests || []).map(s => s.toLowerCase());
-  const sharedInterests = (candidate.interests || []).filter(item => viewerInterests.includes(item.toLowerCase()));
-  if (sharedInterests.length > 0) {
-    reasons.push(`Shared interest: ${sharedInterests.join(', ')}.`);
-  }
-
-  // 2. Shared skills
-  const viewerSkills = (viewer.skills || []).map(s => s.toLowerCase());
-  const sharedSkills = (candidate.skills || []).filter(item => viewerSkills.includes(item.toLowerCase()));
-  if (sharedSkills.length > 0) {
-    reasons.push(`Skill in common: ${sharedSkills.join(', ')}.`);
-  }
-
-  // 3. Shared connection goals
-  const viewerGoals = (viewer.goals || []).map(s => s.toLowerCase());
-  const sharedGoals = (candidate.goals || []).filter(item => viewerGoals.includes(item.toLowerCase()));
-  if (sharedGoals.length > 0) {
-    reasons.push(`Shared goal: ${sharedGoals.join(', ')}.`);
-  }
-
-  // 4. Complementary courses (different courses with shared interest in project collaboration)
-  const normCandCourse = normalizeCourseId(candidate.courseId);
-  const normViewerCourse = normalizeCourseId(viewer.courseId);
-  const candHasProjectCollab = (candidate.goals || []).some(g => g.toLowerCase() === 'project collaboration');
-  const viewerHasProjectCollab = (viewer.goals || []).some(g => g.toLowerCase() === 'project collaboration');
-
-  if (normCandCourse && normViewerCourse && normCandCourse !== normViewerCourse && candHasProjectCollab && viewerHasProjectCollab) {
-    reasons.push('Different courses, with a shared interest in project collaboration.');
-  }
-
-  // 5. Fallback when no criteria match
-  if (reasons.length === 0) {
-    reasons.push('No shared criteria found yet.');
-  }
-
-  return reasons;
-}
-
 // -------------------------------------------------------------
 // 11. Search & Filter Profiles with Explainable Fit (GET /api/profiles)
 // -------------------------------------------------------------
@@ -793,7 +751,7 @@ app.get('/api/profiles', authMiddleware, async (req, res) => {
       }
 
       // Compute explainable fit reasons based on saved profile data
-      const fitReasons = calculateFitReasons(candidate, viewer);
+      const match = calculateMatch(candidate, viewer);
 
       // Add profile card with private account fields excluded
       matched.push({
@@ -806,7 +764,8 @@ app.get('/api/profiles', authMiddleware, async (req, res) => {
         skills: candidate.skills,
         interests: candidate.interests,
         goals: candidate.goals,
-        fitReasons
+        fitReasons: match.reasons,
+        matchRank: match.rank
       });
     }
 
@@ -814,7 +773,8 @@ app.get('/api/profiles', authMiddleware, async (req, res) => {
     const total = matched.length;
     const totalPages = Math.ceil(total / limit) || 1;
     const startIndex = (page - 1) * limit;
-    const paginatedProfiles = matched.slice(startIndex, startIndex + limit);
+    matched.sort((a, b) => b.matchRank - a.matchRank || a.displayName.localeCompare(b.displayName));
+    const paginatedProfiles = matched.slice(startIndex, startIndex + limit).map(({ matchRank, ...profile }) => profile);
 
     res.json({
       profiles: paginatedProfiles,
@@ -851,7 +811,7 @@ app.get(['/api/profiles/:userId', '/api/profile/:userId'], authMiddleware, async
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const fitReasons = calculateFitReasons(candidate, viewer);
+    const fitReasons = calculateMatch(candidate, viewer).reasons;
 
     res.json({
       id: candidate.id,

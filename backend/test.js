@@ -637,7 +637,7 @@ async function runTests() {
       Array.isArray(amaraProfileCard.fitReasons) &&
       amaraProfileCard.fitReasons.some(r => r.includes('Shared interest: Technology')) &&
       amaraProfileCard.fitReasons.some(r => r.includes('Shared goal: Project collaboration')) &&
-      amaraProfileCard.fitReasons.some(r => r.includes('Different courses, with a shared interest in project collaboration')),
+      amaraProfileCard.fitReasons.some(r => r.includes('Different courses, with a shared project-collaboration goal')),
       'TEST 35: Candidate includes factual fit reasons: shared interest, shared goal, and cross-course collaboration'
     );
 
@@ -646,18 +646,22 @@ async function runTests() {
     const danielProfileCard = allDiscoveryData.profiles.find(p => p.id === danielData.user.id);
     assert(
       danielProfileCard &&
-      danielProfileCard.fitReasons.some(r => r.includes('Skill in common: React')),
+      danielProfileCard.fitReasons.some(r => r.includes('Skills in common: React') && r.includes('collaborate')),
       'TEST 36: Candidate includes factual fit reasons for shared skills'
     );
 
-    // TEST 37: Fallback explanation when no criteria match (Acceptance Criterion 8)
-    // Candidate Sofia Ahmed has no shared skills, interests, or goals with Alex Rivers
+    // TEST 37: Complementary business and software skills explain a useful project fit
+    // Candidate Sofia Ahmed brings Marketing; Alex Rivers brings React, JavaScript, and Node.js.
     const sofiaProfileCard = allDiscoveryData.profiles.find(p => p.id === sofiaData.user.id);
     assert(
       sofiaProfileCard &&
-      sofiaProfileCard.fitReasons.length === 1 &&
-      sofiaProfileCard.fitReasons[0] === 'No shared criteria found yet.',
-      'TEST 37: When no shared criteria exist, fitReasons states "No shared criteria found yet."'
+      sofiaProfileCard.fitReasons.some(reason =>
+        reason.includes('Complementary strengths:') &&
+        reason.includes('Marketing') &&
+        reason.includes('reach users') &&
+        reason.includes('build the product')
+      ),
+      'TEST 37: Business skills explain a practical contribution to a software project'
     );
 
     // TEST 38: Empty search results state (Acceptance Criterion 9)
